@@ -1,0 +1,5 @@
+{
+    "user.core.status.active": "Active",
+    "user.core.status.suspended": "Suspended",
+    "user.core.status.blocked": "Blocked"
+}

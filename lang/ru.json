@@ -1,0 +1,5 @@
+{
+    "common.status.active": "Активен",
+    "common.status.suspended": "Заморожен",
+    "common.status.blocked": "Заблокирован"
+}
