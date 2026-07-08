@@ -13,7 +13,14 @@ return new class extends Migration
     {
         Schema::create('game_content_types', function (Blueprint $table) {
             $table->id();
-            $table->timestamps();
+
+            $table->foreignId('game_id')->constrained('games')->cascadeOnDelete();
+            $table->foreignId('content_type_id')->constrained('content_types')->cascadeOnDelete();
+            $table->jsonb('notes')->nullable();
+
+            $table->timestampsTz();
+
+            $table->unique(['game_id', 'content_type_id']);
         });
     }
 

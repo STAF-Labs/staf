@@ -16,12 +16,12 @@ return new class extends Migration
 
             $table->foreignId('organization_id')->constrained('organizations')->cascadeOnDelete();
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            $table->foreignId('invited_by')->nullable()->constrained('users')->cascadeOnDelete();
+            $table->foreignId('invited_by')->nullable()->constrained('users')->nullOnDelete();
 
             $table->string('public_title', 64)->nullable()->comment('Должность участника');
 
-            $table->string('status')->default('');
-            $table->timestampsTz('invited_at');
+            $table->string('status', 32)->default('active');
+            $table->timestampTz('invited_at')->nullable();
 
             $table->timestampsTz();
             $table->unique(

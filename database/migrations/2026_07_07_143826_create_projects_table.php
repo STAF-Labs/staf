@@ -13,7 +13,20 @@ return new class extends Migration
     {
         Schema::create('projects', function (Blueprint $table) {
             $table->id();
-            $table->timestamps();
+
+            $table->morphs('ownerable');
+            $table->foreignId('game_content_type_id')->constrained('game_content_types')->restrictOnDelete();
+
+            $table->string('title', 128);
+            $table->string('slug', 128)->unique();
+            $table->jsonb('summary')->nullable();
+            $table->jsonb('description');
+            $table->jsonb('tags')->nullable();
+            $table->jsonb('website_urls')->nullable();
+
+            $table->string('status', 32)->default('on_moderation');
+
+            $table->timestampsTz();
         });
     }
 

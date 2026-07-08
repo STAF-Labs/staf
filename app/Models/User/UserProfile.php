@@ -5,12 +5,13 @@ namespace App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\File;
 
-class UserProfile extends Model
+class UserProfile extends Model implements HasMedia
 {
-    use InteractsWithMedia, softDeletes;
+    use InteractsWithMedia, SoftDeletes;
 
     protected $table = 'user_profiles';
 
@@ -24,7 +25,16 @@ class UserProfile extends Model
 
         'is_public',
         'show_online_status',
-        'show_last_seen_at'
+        'show_last_seen_at',
+    ];
+
+    protected $casts = [
+        'bio' => 'json:unicode',
+        'birthday' => 'date',
+        'is_public' => 'boolean',
+        'show_last_seen_at' => 'boolean',
+        'show_online_status' => 'boolean',
+        'website_urls' => 'json:unicode',
     ];
 
     public function user(): BelongsTo

@@ -13,7 +13,15 @@ return new class extends Migration
     {
         Schema::create('dimensions', function (Blueprint $table) {
             $table->id();
-            $table->timestamps();
+
+            $table->string('name', 64);
+            $table->string('slug', 100)->unique();
+
+            $table->string('selection_mode')->default('single');
+            $table->boolean('is_filterable')->default(true);
+            $table->boolean('is_active')->default(true);
+
+            $table->timestampsTz();
         });
     }
 

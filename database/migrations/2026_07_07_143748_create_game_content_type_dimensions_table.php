@@ -13,7 +13,18 @@ return new class extends Migration
     {
         Schema::create('game_content_type_dimensions', function (Blueprint $table) {
             $table->id();
-            $table->timestamps();
+
+            $table->foreignId('game_content_type_id')->constrained('game_content_types')->cascadeOnDelete();
+            $table->foreignId('dimension_id')->constrained('dimensions')->cascadeOnDelete();
+
+            $table->boolean('is_required')->default(true);
+            $table->integer('sort_order')->default(0);
+
+            $table->jsonb('notes')->nullable();
+
+            $table->timestampsTz();
+
+            $table->unique(['game_content_type_id', 'dimension_id'], 'game_content_type_dimensions_unique');
         });
     }
 

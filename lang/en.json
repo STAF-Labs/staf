@@ -1,5 +1,5 @@
 {
-    "user.core.status.active": "Active",
-    "user.core.status.suspended": "Suspended",
-    "user.core.status.blocked": "Blocked"
+    "common.status.active": "Active",
+    "common.status.suspended": "Suspended",
+    "common.status.blocked": "Blocked"
 }

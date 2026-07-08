@@ -3,21 +3,24 @@
 namespace App\Models\User;
 
 use App\Enums\CommonStatus;
+use App\Models\Game\Project\Project;
 use App\Models\Org\Organization;
 use App\Models\Org\OrganizationMember;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Filament\Models\Contracts\HasName;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable
+class User extends Authenticatable implements HasName
 {
-    use HasFactory, Notifiable, HasRoles, softDeletes;
+    use HasRoles, Notifiable, SoftDeletes;
 
     protected $table = 'users';
+
     protected string $guard_name = 'web';
 
     protected $fillable = [
@@ -48,16 +51,26 @@ class User extends Authenticatable
 
     public function creatorOf(): HasMany
     {
-        return $this->HasMany(Organization::class, 'created_by');
+        return $this->hasMany(Organization::class, 'created_by');
     }
 
     public function memberOf(): HasMany
     {
-        return $this->HasMany(OrganizationMember::class, 'user_id');
+        return $this->hasMany(OrganizationMember::class, 'user_id');
     }
 
     public function inviterOf(): HasMany
     {
-        return $this->HasMany(OrganizationMember::class, 'invited_by');
+        return $this->hasMany(OrganizationMember::class, 'invited_by');
+    }
+
+    public function projects(): MorphMany
+    {
+        return $this->morphMany(Project::class, 'ownerable');
+    }
+
+    public function getFilamentName(): string
+    {
+        return $this->username;
     }
 }

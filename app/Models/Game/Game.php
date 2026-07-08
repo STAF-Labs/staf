@@ -2,21 +2,25 @@
 
 namespace App\Models\Game;
 
+use App\Concerns\HasSlug;
 use App\Enums\CommonStatus;
+use App\Models\Game\ContentType\GameContentType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\File;
 
-class Game extends Model
+class Game extends Model implements HasMedia
 {
-    use InteractsWithMedia, softDeletes;
+    use HasSlug, InteractsWithMedia, SoftDeletes;
 
     protected $table = 'games';
 
     protected $fillable = [
         'name',
+        'slug',
         'description',
         'released_at',
 
@@ -24,8 +28,15 @@ class Game extends Model
     ];
 
     protected $casts = [
+        'description' => 'json:unicode',
+        'released_at' => 'date',
         'status' => CommonStatus::class,
     ];
+
+    public function gameContentTypes(): HasMany
+    {
+        return $this->hasMany(GameContentType::class);
+    }
 
     public function registerMediaCollections(): void
     {

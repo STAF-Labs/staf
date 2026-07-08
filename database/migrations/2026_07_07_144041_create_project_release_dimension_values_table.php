@@ -13,7 +13,13 @@ return new class extends Migration
     {
         Schema::create('project_release_dimension_values', function (Blueprint $table) {
             $table->id();
-            $table->timestamps();
+
+            $table->foreignId('project_release_id')->constrained('project_releases')->cascadeOnDelete();
+            $table->foreignId('dimension_value_id')->constrained('dimension_values')->cascadeOnDelete();
+
+            $table->timestampsTz();
+
+            $table->unique(['project_release_id', 'dimension_value_id'], 'project_release_dimension_values_unique');
         });
     }
 

@@ -17,7 +17,12 @@ class OrganizationMember extends Model
 
         'public_title',
 
+        'status',
         'invited_at',
+    ];
+
+    protected $casts = [
+        'invited_at' => 'datetime',
     ];
 
     public function inOrganization(): BelongsTo
@@ -30,7 +35,7 @@ class OrganizationMember extends Model
         return $this->belongsTo(User::class, 'user_id');
     }
 
-    public function inviteBy(): BelongsTo
+    public function invitedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'invited_by');
     }

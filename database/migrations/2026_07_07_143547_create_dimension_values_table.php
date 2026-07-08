@@ -13,7 +13,16 @@ return new class extends Migration
     {
         Schema::create('dimension_values', function (Blueprint $table) {
             $table->id();
-            $table->timestamps();
+
+            $table->foreignId('dimension_id')->constrained('dimensions')->cascadeOnDelete();
+            $table->foreignId('parent_id')->nullable()->constrained('dimension_values')->nullOnDelete();
+
+            $table->string('name', 64);
+            $table->integer('sort_order')->default(0);
+
+            $table->boolean('is_active')->default(true);
+
+            $table->timestampsTz();
         });
     }
 
