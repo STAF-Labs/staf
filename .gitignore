@@ -22,3 +22,14 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# DOCS
+/docs/schemas/*
+
+# AI | AGENTS
+/.agents
+/.claude
+/.codex
+/.github
+AGENTS.md
+CLAUDE.md

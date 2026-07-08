@@ -1,0 +1,22 @@
+{
+    "agents": [
+        "codex",
+        "claude_code",
+        "copilot"
+    ],
+    "cloud": false,
+    "guidelines": true,
+    "mcp": true,
+    "nightwatch": false,
+    "packages": [
+        "filament/filament",
+        "spatie/laravel-medialibrary",
+        "spatie/laravel-permission"
+    ],
+    "sail": true,
+    "skills": [
+        "laravel-best-practices",
+        "medialibrary-development",
+        "laravel-permission-development"
+    ]
+}
