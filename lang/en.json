@@ -1,5 +1,25 @@
 {
-    "common.status.active": "Active",
-    "common.status.suspended": "Suspended",
-    "common.status.blocked": "Blocked"
+    "enum.common.status.active": "Active",
+    "enum.common.status.blocked": "Blocked",
+    "enum.common.status.suspended": "Suspended",
+    "enum.dim.selection_mode.multiple": "Multiple",
+    "enum.dim.selection_mode.single": "Single",
+    "enum.membership.status.active": "Active",
+    "enum.membership.status.invited": "Invited",
+    "enum.membership.status.suspended": "Suspended",
+    "enum.org.member.role.maintainer": "Maintainer",
+    "enum.org.member.role.member": "Member",
+    "enum.org.member.role.owner": "Owner",
+    "enum.org.member.role.reader": "Reader",
+    "enum.project.member.role.maintainer": "Maintainer",
+    "enum.project.member.role.member": "Member",
+    "enum.project.member.role.owner": "Owner",
+    "enum.project.release.status.archived": "Archived",
+    "enum.project.release.status.draft": "Draft",
+    "enum.project.release.status.published": "Published",
+    "enum.project.status.archived": "Archived",
+    "enum.project.status.draft": "Draft",
+    "enum.project.status.on_moderation": "On moderation",
+    "enum.project.status.published": "Published",
+    "enum.project.status.rejected": "Rejected"
 }

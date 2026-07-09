@@ -18,15 +18,21 @@ class GameContentTypeDimension extends Model
         'notes',
     ];
 
-    protected $casts = [
-        'is_required' => 'boolean',
-        'notes' => 'json:unicode',
-        'sort_order' => 'integer',
-    ];
-
     public function gameContentType(): BelongsTo
     {
         return $this->belongsTo(GameContentType::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'is_required' => 'boolean',
+            'notes' => 'json:unicode',
+            'sort_order' => 'integer',
+        ];
     }
 
     public function dimension(): BelongsTo

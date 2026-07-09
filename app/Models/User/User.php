@@ -33,16 +33,23 @@ class User extends Authenticatable implements HasName
         'last_seen_at',
     ];
 
-    protected $casts = [
-        'email_verified_at' => 'datetime',
-        'password' => 'hashed',
-        'status' => CommonStatus::class,
-    ];
-
     protected $hidden = [
         'password',
         'remember_token',
     ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'last_seen_at' => 'datetime',
+            'password' => 'hashed',
+            'status' => CommonStatus::class,
+        ];
+    }
 
     public function userProfile(): HasOne
     {

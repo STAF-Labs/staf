@@ -27,15 +27,21 @@ class Game extends Model implements HasMedia
         'status',
     ];
 
-    protected $casts = [
-        'description' => 'json:unicode',
-        'released_at' => 'date',
-        'status' => CommonStatus::class,
-    ];
-
     public function gameContentTypes(): HasMany
     {
         return $this->hasMany(GameContentType::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'description' => 'json:unicode',
+            'released_at' => 'date',
+            'status' => CommonStatus::class,
+        ];
     }
 
     public function registerMediaCollections(): void

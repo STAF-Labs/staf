@@ -31,22 +31,28 @@ class Organization extends Model implements HasMedia
         'website_urls',
         'contact_email',
 
-        'visibility',
+        'is_visible',
         'status',
         'verified_at',
-    ];
-
-    protected $casts = [
-        'description' => 'json:unicode',
-        'visibility' => 'boolean',
-        'status' => CommonStatus::class,
-        'verified_at' => 'datetime',
-        'website_urls' => 'json:unicode',
     ];
 
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'description' => 'json:unicode',
+            'is_visible' => 'boolean',
+            'status' => CommonStatus::class,
+            'verified_at' => 'datetime',
+            'website_urls' => 'json:unicode',
+        ];
     }
 
     public function orgMembers(): HasMany

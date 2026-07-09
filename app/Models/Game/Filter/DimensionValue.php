@@ -19,14 +19,20 @@ class DimensionValue extends Model
         'is_active',
     ];
 
-    protected $casts = [
-        'is_active' => 'boolean',
-        'sort_order' => 'integer',
-    ];
-
     public function dimension(): BelongsTo
     {
         return $this->belongsTo(Dimension::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'is_active' => 'boolean',
+            'sort_order' => 'integer',
+        ];
     }
 
     public function parent(): BelongsTo

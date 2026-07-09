@@ -2,6 +2,8 @@
 
 namespace App\Models\Org;
 
+use App\Enums\MembershipStatus;
+use App\Enums\Org\OrgMemberRole;
 use App\Models\User\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,18 +18,27 @@ class OrganizationMember extends Model
         'invited_by',
 
         'public_title',
+        'role',
 
         'status',
         'invited_at',
     ];
 
-    protected $casts = [
-        'invited_at' => 'datetime',
-    ];
-
     public function inOrganization(): BelongsTo
     {
         return $this->belongsTo(Organization::class, 'organization_id');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'invited_at' => 'datetime',
+            'role' => OrgMemberRole::class,
+            'status' => MembershipStatus::class,
+        ];
     }
 
     public function member(): BelongsTo

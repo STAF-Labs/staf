@@ -1,5 +1,25 @@
 {
-    "common.status.active": "Активен",
-    "common.status.suspended": "Заморожен",
-    "common.status.blocked": "Заблокирован"
+    "enum.common.status.active": "Активен",
+    "enum.common.status.blocked": "Заблокирован",
+    "enum.common.status.suspended": "Заморожен",
+    "enum.dim.selection_mode.multiple": "Множественный выбор",
+    "enum.dim.selection_mode.single": "Одиночный выбор",
+    "enum.membership.status.active": "Активен",
+    "enum.membership.status.invited": "Приглашён",
+    "enum.membership.status.suspended": "Приостановлен",
+    "enum.org.member.role.maintainer": "Менеджер",
+    "enum.org.member.role.member": "Участник",
+    "enum.org.member.role.owner": "Владелец",
+    "enum.org.member.role.reader": "Читатель",
+    "enum.project.member.role.maintainer": "Менеджер",
+    "enum.project.member.role.member": "Участник",
+    "enum.project.member.role.owner": "Владелец",
+    "enum.project.release.status.archived": "В архиве",
+    "enum.project.release.status.draft": "Черновик",
+    "enum.project.release.status.published": "Опубликован",
+    "enum.project.status.archived": "В архиве",
+    "enum.project.status.draft": "Черновик",
+    "enum.project.status.on_moderation": "На модерации",
+    "enum.project.status.published": "Опубликован",
+    "enum.project.status.rejected": "Отклонён"
 }

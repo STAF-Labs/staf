@@ -3,6 +3,7 @@
 namespace App\Models\Game\Project;
 
 use App\Concerns\HasSlug;
+use App\Enums\Project\ProjectStatus;
 use App\Models\Game\ContentType\GameContentType;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -25,19 +26,27 @@ class Project extends Model
         'description',
         'tags',
         'website_urls',
-        'status',
-    ];
 
-    protected $casts = [
-        'description' => 'json:unicode',
-        'summary' => 'json:unicode',
-        'tags' => 'json:unicode',
-        'website_urls' => 'json:unicode',
+        'status',
     ];
 
     public function ownerable(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'description' => 'json:unicode',
+            'status' => ProjectStatus::class,
+            'summary' => 'json:unicode',
+            'tags' => 'json:unicode',
+            'website_urls' => 'json:unicode',
+        ];
     }
 
     public function gameContentType(): BelongsTo

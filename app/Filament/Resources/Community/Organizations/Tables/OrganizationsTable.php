@@ -29,7 +29,7 @@ class OrganizationsTable
                     ->searchable(),
                 TextColumn::make('contact_email')
                     ->searchable(),
-                IconColumn::make('visibility')
+                IconColumn::make('is_visible')
                     ->boolean(),
                 TextColumn::make('status')
                     ->badge()

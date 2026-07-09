@@ -19,6 +19,7 @@ return new class extends Migration
             $table->foreignId('invited_by')->nullable()->constrained('users')->nullOnDelete();
 
             $table->string('public_title', 64)->nullable()->comment('Должность участника');
+            $table->string('role', 32)->default('reader');
 
             $table->string('status', 32)->default('active');
             $table->timestampTz('invited_at')->nullable();

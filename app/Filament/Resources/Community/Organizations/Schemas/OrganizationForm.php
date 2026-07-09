@@ -26,7 +26,7 @@ class OrganizationForm
                 TextInput::make('website_urls'),
                 TextInput::make('contact_email')
                     ->email(),
-                Toggle::make('visibility')
+                Toggle::make('is_visible')
                     ->required(),
                 Select::make('status')
                     ->options(CommonStatus::class)

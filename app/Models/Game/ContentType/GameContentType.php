@@ -19,13 +19,19 @@ class GameContentType extends Model
         'notes',
     ];
 
-    protected $casts = [
-        'notes' => 'json:unicode',
-    ];
-
     public function game(): BelongsTo
     {
         return $this->belongsTo(Game::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'notes' => 'json:unicode',
+        ];
     }
 
     public function contentType(): BelongsTo

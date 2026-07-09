@@ -18,12 +18,18 @@ class ContentType extends Model
         'is_public',
     ];
 
-    protected $casts = [
-        'is_public' => 'boolean',
-    ];
-
     public function gameContentTypes(): HasMany
     {
         return $this->hasMany(GameContentType::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'is_public' => 'boolean',
+        ];
     }
 }

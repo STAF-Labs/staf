@@ -1,31 +1,29 @@
 <?php
 
-namespace App\Enums;
+namespace App\Enums\Filter;
 
 use App\Concerns\EnumOptions;
 use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasLabel;
 use Illuminate\Contracts\Support\Htmlable;
 
-enum CommonStatus: string implements HasColor, HasLabel
+enum DimSelectionMode: string implements HasColor, HasLabel
 {
     use EnumOptions;
 
-    case ACTIVE = 'active';
-    case SUSPENDED = 'suspended';
-    case BLOCKED = 'blocked';
+    case SINGLE = 'single';
+    case MULTIPLE = 'multiple';
 
     public function getLabel(): string|Htmlable|null
     {
-        return __("enum.common.status.{$this->value}");
+        return __("enum.dim.selection_mode.{$this->value}");
     }
 
     public function getColor(): string|array|null
     {
         return match ($this) {
-            self::ACTIVE => 'success',
-            self::SUSPENDED => 'gray',
-            self::BLOCKED => 'danger',
+            self::SINGLE => 'info',
+            self::MULTIPLE => 'warning',
         };
     }
 }

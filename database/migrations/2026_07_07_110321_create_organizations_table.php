@@ -24,7 +24,7 @@ return new class extends Migration
             $table->jsonb('website_urls')->nullable();
             $table->string('contact_email')->nullable();
 
-            $table->boolean('visibility')->default(true);
+            $table->boolean('is_visible')->default(true);
             $table->string('status', 32)->default(CommonStatus::ACTIVE)->index();
             $table->timestamp('verified_at')->nullable();
 

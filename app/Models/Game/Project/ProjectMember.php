@@ -2,6 +2,8 @@
 
 namespace App\Models\Game\Project;
 
+use App\Enums\MembershipStatus;
+use App\Enums\Project\ProjectMemberRole;
 use App\Models\User\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,6 +22,17 @@ class ProjectMember extends Model
     public function project(): BelongsTo
     {
         return $this->belongsTo(Project::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'role' => ProjectMemberRole::class,
+            'status' => MembershipStatus::class,
+        ];
     }
 
     public function user(): BelongsTo

@@ -1,31 +1,31 @@
 <?php
 
-namespace App\Enums;
+namespace App\Enums\Project;
 
 use App\Concerns\EnumOptions;
 use Filament\Support\Contracts\HasColor;
 use Filament\Support\Contracts\HasLabel;
 use Illuminate\Contracts\Support\Htmlable;
 
-enum CommonStatus: string implements HasColor, HasLabel
+enum ProjectMemberRole: string implements HasColor, HasLabel
 {
     use EnumOptions;
 
-    case ACTIVE = 'active';
-    case SUSPENDED = 'suspended';
-    case BLOCKED = 'blocked';
+    case OWNER = 'owner';
+    case MAINTAINER = 'maintainer';
+    case MEMBER = 'member';
 
     public function getLabel(): string|Htmlable|null
     {
-        return __("enum.common.status.{$this->value}");
+        return __("enum.project.member.role.{$this->value}");
     }
 
     public function getColor(): string|array|null
     {
         return match ($this) {
-            self::ACTIVE => 'success',
-            self::SUSPENDED => 'gray',
-            self::BLOCKED => 'danger',
+            self::OWNER => 'success',
+            self::MAINTAINER => 'info',
+            self::MEMBER => 'warning',
         };
     }
 }

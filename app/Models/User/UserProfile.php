@@ -28,18 +28,24 @@ class UserProfile extends Model implements HasMedia
         'show_last_seen_at',
     ];
 
-    protected $casts = [
-        'bio' => 'json:unicode',
-        'birthday' => 'date',
-        'is_public' => 'boolean',
-        'show_last_seen_at' => 'boolean',
-        'show_online_status' => 'boolean',
-        'website_urls' => 'json:unicode',
-    ];
-
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'bio' => 'json:unicode',
+            'birthday' => 'date',
+            'is_public' => 'boolean',
+            'show_last_seen_at' => 'boolean',
+            'show_online_status' => 'boolean',
+            'website_urls' => 'json:unicode',
+        ];
     }
 
     public function registerMediaCollections(): void
