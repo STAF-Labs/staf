@@ -28,6 +28,7 @@ class AdmPanelProvider extends PanelProvider
             ->default()
             ->id('adm')
             ->path('adm')
+            ->viteTheme('resources/css/filament/adm/theme.css')
             ->login()
             ->colors([
                 'primary' => Color::Amber,
