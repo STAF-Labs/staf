@@ -1,40 +1,78 @@
-*.log
-.DS_Store
-.env
-.env.backup
-.env.production
-.phpactor.json
-.phpunit.result.cache
-/.fleet
-/.idea
-/.nova
-/.phpunit.cache
-/.vscode
-/.zed
+# ENVIRONMENT
+/.env
+/.env.backup
+/.env.production
 /auth.json
-/node_modules
-/public/build
-/public/hot
-/public/storage
+
+# PHP | COMPOSER
+/vendor/
+/.phpactor.json
+
+# LARAVEL
+/bootstrap/cache/*.php
+/database/database.sqlite
 /storage/*.key
-/storage/pail
-/vendor
-Homestead.json
-Homestead.yaml
-Thumbs.db
+/storage/app/*
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/testing/*
+/storage/framework/views/*
+/storage/logs/*
+/storage/pail/
+!/storage/app/.gitignore
+!/storage/framework/cache/.gitignore
+!/storage/framework/sessions/.gitignore
+!/storage/framework/testing/.gitignore
+!/storage/framework/views/.gitignore
+!/storage/logs/.gitignore
+
+# TESTS
+/.phpunit.cache/
+/.phpunit.result.cache
+
+# NODE | VITE
+/node_modules/
+/public/build/
+/public/hot
+/client/node_modules/
+/client/dist/
 
 # VENDORS
-/public/css/filament/*
-/public/fonts/filament/*
-/public/js/filament/*
+/public/css/filament/
+/public/fonts/filament/
+/public/js/filament/
+/public/storage/
+
+# LOGS
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# IDE | EDITORS
+/.fleet/
+/.idea/
+/.nova/
+/.vscode/
+/.zed/
+/client/.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# HOMESTEAD
+Homestead.json
+Homestead.yaml
 
 # DOCS
-/docs/schemas/*
+/docs/schemas/
 
 # AI | AGENTS
-/.agents
-/.claude
-/.codex
-/.github
+/.agents/
+/.claude/
+/.codex/
+/.github/
 AGENTS.md
 CLAUDE.md
