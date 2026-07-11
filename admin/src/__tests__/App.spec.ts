@@ -1,11 +1,20 @@
 import { describe, it, expect } from 'vitest'
 
 import { mount } from '@vue/test-utils'
-import App from '../App.vue'
+import LoginView from '../views/LoginView.vue'
 
 describe('App', () => {
-  it('mounts renders properly', () => {
-    const wrapper = mount(App)
-    expect(wrapper.text()).toContain('You did it!')
+  it('renders the login page', () => {
+    const wrapper = mount(LoginView, {
+      global: {
+        mocks: {
+          $router: {
+            push: () => undefined,
+          },
+        },
+      },
+    })
+
+    expect(wrapper.text()).toContain('Вход')
   })
 })

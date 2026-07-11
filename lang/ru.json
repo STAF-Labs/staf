@@ -1,4 +1,6 @@
 {
+    "Logged out.": "Выход выполнен.",
+    "auth.failed": "Учетные данные не совпадают с нашими записями.",
     "enum.common.status.active": "Активен",
     "enum.common.status.blocked": "Заблокирован",
     "enum.common.status.suspended": "Заморожен",

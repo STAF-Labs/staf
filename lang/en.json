@@ -1,4 +1,6 @@
 {
+    "Logged out.": "Logged out.",
+    "auth.failed": "These credentials do not match our records.",
     "enum.common.status.active": "Active",
     "enum.common.status.blocked": "Blocked",
     "enum.common.status.suspended": "Suspended",
