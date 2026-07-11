@@ -3,11 +3,9 @@
 namespace App\Enums\Filter;
 
 use App\Concerns\EnumOptions;
-use Filament\Support\Contracts\HasColor;
-use Filament\Support\Contracts\HasLabel;
 use Illuminate\Contracts\Support\Htmlable;
 
-enum DimSelectionMode: string implements HasColor, HasLabel
+enum DimSelectionMode: string
 {
     use EnumOptions;
 

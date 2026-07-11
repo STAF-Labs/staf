@@ -3,11 +3,9 @@
 namespace App\Enums\Org;
 
 use App\Concerns\EnumOptions;
-use Filament\Support\Contracts\HasColor;
-use Filament\Support\Contracts\HasLabel;
 use Illuminate\Contracts\Support\Htmlable;
 
-enum OrgMemberRole: string implements HasColor, HasLabel
+enum OrgMemberRole: string
 {
     use EnumOptions;
 

@@ -3,11 +3,9 @@
 namespace App\Enums\Project;
 
 use App\Concerns\EnumOptions;
-use Filament\Support\Contracts\HasColor;
-use Filament\Support\Contracts\HasLabel;
 use Illuminate\Contracts\Support\Htmlable;
 
-enum ProjectStatus: string implements HasColor, HasLabel
+enum ProjectStatus: string
 {
     use EnumOptions;
 
