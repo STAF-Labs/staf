@@ -3,11 +3,9 @@
 namespace App\Enums;
 
 use App\Concerns\EnumOptions;
-use Filament\Support\Contracts\HasColor;
-use Filament\Support\Contracts\HasLabel;
 use Illuminate\Contracts\Support\Htmlable;
 
-enum MembershipStatus: string implements HasColor, HasLabel
+enum MembershipStatus: string
 {
     use EnumOptions;
 

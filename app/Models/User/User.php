@@ -6,7 +6,6 @@ use App\Enums\CommonStatus;
 use App\Models\Game\Project\Project;
 use App\Models\Org\Organization;
 use App\Models\Org\OrganizationMember;
-use Filament\Models\Contracts\HasName;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
@@ -15,7 +14,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 
-class User extends Authenticatable implements HasName
+class User extends Authenticatable
 {
     use HasRoles, Notifiable, SoftDeletes;
 
@@ -76,8 +75,4 @@ class User extends Authenticatable implements HasName
         return $this->morphMany(Project::class, 'ownerable');
     }
 
-    public function getFilamentName(): string
-    {
-        return $this->username;
-    }
 }

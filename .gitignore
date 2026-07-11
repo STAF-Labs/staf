@@ -38,9 +38,6 @@
 /client/dist/
 
 # VENDORS
-/public/css/filament/
-/public/fonts/filament/
-/public/js/filament/
 /public/storage/
 
 # LOGS
