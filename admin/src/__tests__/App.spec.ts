@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 
 import { mount } from '@vue/test-utils'
-import LoginView from '../views/LoginView.vue'
+import LoginView from '../views/auth/LoginView.vue'
 
 describe('App', () => {
   it('renders the login page', () => {
