@@ -67,9 +67,7 @@ Homestead.yaml
 docs/schemas/
 
 # AI / agents
-.agents/
 .claude/
-.codex/
 .github/
 CLAUDE.md
 /pnpm-lock.yaml

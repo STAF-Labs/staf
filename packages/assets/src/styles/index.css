@@ -1,5 +1,4 @@
 @import './foundations/fonts.css';
-@import './foundations/tokens.css';
 @import './themes/theme.css';
 @import './foundations/base.css';
 @import './components/button.css';

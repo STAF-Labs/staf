@@ -48,7 +48,7 @@ export async function fetchCurrentUser(): Promise<User | null> {
 
     return response.data
   } catch (error) {
-    if (error instanceof AxiosError && error.response?.status === 401) {
+    if (error instanceof AxiosError) {
       currentUser.value = null
 
       return null
