@@ -72,3 +72,4 @@ docs/schemas/
 .codex/
 .github/
 CLAUDE.md
+/pnpm-lock.yaml
