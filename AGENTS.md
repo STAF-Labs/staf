@@ -209,3 +209,13 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - Always activate the `medialibrary-development` skill when working with media uploads, conversions, collections, responsive images, or any code that uses the `HasMedia` interface or `InteractsWithMedia` trait.
 
 </laravel-boost-guidelines>
+
+## Running the project locally
+
+Full startup runbook (backend via Laravel Sail, frontends via Vite): see
+[`.agents/run/`](.agents/run/README.md) — [`windows.md`](.agents/run/windows.md)
+is the current, verified guide (Linux is a placeholder for now). It covers the
+exact order (pnpm install → composer in a container → `docker compose build && up`
+→ `migrate:fresh --seed` → Vite), the port map, the seeded admin login, and the
+known gotchas (admin must run on :5175 for CORS, Vite's IPv6-only bind, npm
+`ECONNRESET` during the image build).
