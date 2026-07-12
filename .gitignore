@@ -1,75 +1,74 @@
-# ENVIRONMENT
-/.env
-/.env.backup
-/.env.production
-/auth.json
+# Node
+node_modules/
+.pnpm-store/
+apps/*/node_modules/
+packages/*/node_modules/
 
-# PHP | COMPOSER
-/vendor/
-/.phpactor.json
+# Frontend builds
+apps/client/dist/
+apps/admin/dist/
+apps/api/public/build/
+apps/api/public/hot
 
-# LARAVEL
-/bootstrap/cache/*.php
-/database/database.sqlite
-/storage/*.key
-/storage/app/*
-/storage/framework/cache/*
-/storage/framework/sessions/*
-/storage/framework/testing/*
-/storage/framework/views/*
-/storage/logs/*
-/storage/pail/
-!/storage/app/.gitignore
-!/storage/framework/cache/.gitignore
-!/storage/framework/sessions/.gitignore
-!/storage/framework/testing/.gitignore
-!/storage/framework/views/.gitignore
-!/storage/logs/.gitignore
+# Laravel
+apps/api/vendor/
+apps/api/.env
+apps/api/.env.backup
+apps/api/.env.production
+apps/api/auth.json
+apps/api/.phpactor.json
+apps/api/.phpunit.cache/
+apps/api/.phpunit.result.cache
+apps/api/database/database.sqlite
+apps/api/storage/*.key
+apps/api/storage/app/*
+apps/api/storage/framework/cache/*
+apps/api/storage/framework/sessions/*
+apps/api/storage/framework/testing/*
+apps/api/storage/framework/views/*
+apps/api/storage/logs/*
+apps/api/storage/pail/
+apps/api/bootstrap/cache/*.php
+!apps/api/storage/app/.gitignore
+!apps/api/storage/app/private/.gitignore
+!apps/api/storage/app/public/.gitignore
+!apps/api/storage/framework/.gitignore
+!apps/api/storage/framework/cache/.gitignore
+!apps/api/storage/framework/cache/data/.gitignore
+!apps/api/storage/framework/sessions/.gitignore
+!apps/api/storage/framework/testing/.gitignore
+!apps/api/storage/framework/views/.gitignore
+!apps/api/storage/logs/.gitignore
 
-# TESTS
-/.phpunit.cache/
-/.phpunit.result.cache
+# Vendors / generated public links
+apps/api/public/storage/
 
-# NODE | VITE
-/node_modules/
-/public/build/
-/public/hot
-/client/node_modules/
-/client/dist/
-
-# VENDORS
-/public/storage/
-
-# LOGS
+# Logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# IDE | EDITORS
-/.fleet/
-/.idea/
-/.nova/
-/.vscode/
-/.zed/
-/client/.vscode/
-
-# OS
+# IDE / OS
+.fleet/
+.idea/
+.nova/
+.vscode/
+.zed/
 .DS_Store
 Thumbs.db
 
-# HOMESTEAD
+# Homestead
 Homestead.json
 Homestead.yaml
 
-# DOCS
-/docs/schemas/
+# Docs generated artifacts
+docs/schemas/
 
-# AI | AGENTS
-/.agents/
-/.claude/
-/.codex/
-/.github/
-AGENTS.md
+# AI / agents
+.agents/
+.claude/
+.codex/
+.github/
 CLAUDE.md

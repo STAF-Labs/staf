@@ -1,0 +1,10 @@
+{
+  "name": "@staf/assets",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./fonts/*": "./src/fonts/*",
+    "./images/*": "./src/images/*",
+    "./styles/*": "./src/styles/*"
+  }
+}

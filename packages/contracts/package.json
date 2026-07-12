@@ -1,0 +1,8 @@
+{
+  "name": "@staf/contracts",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
