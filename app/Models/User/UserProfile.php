@@ -50,7 +50,7 @@ class UserProfile extends Model implements HasMedia
 
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('logo')
+        $this->addMediaCollection('avatar')
             ->acceptsFile(
                 fn (File $file): bool => str_starts_with($file->mimeType, 'image/')
             )
