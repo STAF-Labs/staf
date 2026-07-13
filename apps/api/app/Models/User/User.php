@@ -37,6 +37,13 @@ class User extends Authenticatable
         'remember_token',
     ];
 
+    protected static function booted(): void
+    {
+        static::deleting(function (User $user): void {
+            $user->userProfile()->delete();
+        });
+    }
+
     /**
      * @return array<string, string>
      */
@@ -74,5 +81,4 @@ class User extends Authenticatable
     {
         return $this->morphMany(Project::class, 'ownerable');
     }
-
 }

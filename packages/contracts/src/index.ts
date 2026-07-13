@@ -1,1 +1,1 @@
-export type { ListResponse, UserListItem, UserProfileListItem } from './user'
+export type { ListResponse, UserDetail, UserListItem } from './user'
