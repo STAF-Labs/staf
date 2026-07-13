@@ -46,7 +46,14 @@ function valueFor(row: Record<string, unknown>, key: string): string {
         <template v-else>
           <tr v-for="row in rows" :key="String(row.id)">
             <td v-for="column in columns" :key="column.key">
-              {{ valueFor(row, column.key) }}
+              <slot
+                :name="`cell-${column.key}`"
+                :row="row"
+                :value="row[column.key]"
+                :column="column"
+              >
+                {{ valueFor(row, column.key) }}
+              </slot>
             </td>
           </tr>
         </template>
