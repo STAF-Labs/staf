@@ -4,6 +4,7 @@ import DashboardView from '../views/dashboard/DashboardView.vue'
 import LoginView from '../views/auth/LoginView.vue'
 import UsersView from '../views/users/UsersView.vue'
 import OrganizationsView from '@/views/orgs/OrganizationsView.vue'
+import OrganizationView from '@/views/orgs/OrganizationView.vue'
 import UserView from '@/views/users/UserView.vue'
 
 const router = createRouter({
@@ -60,6 +61,15 @@ const router = createRouter({
       meta: {
         requiresAuth: true,
         title: 'Организации',
+      },
+    },
+    {
+      path: '/organizations/:id',
+      name: 'org.show',
+      component: OrganizationView,
+      meta: {
+        requiresAuth: true,
+        title: 'Организация',
       },
     },
   ],
