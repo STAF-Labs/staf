@@ -318,6 +318,96 @@
   color: var(--color-danger);
 }
 
+.organization-table,
+.members-table {
+  overflow-x: auto;
+}
+
+.organization-table table,
+.members-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.organization-table th,
+.organization-table td,
+.members-table th,
+.members-table td {
+  padding: 12px 10px;
+  color: var(--color-text);
+  font-size: 14px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.organization-table th,
+.members-table th {
+  color: var(--color-text-soft);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.organization-table tbody tr,
+.members-table tbody tr {
+  border-top: 1px solid var(--color-border-soft);
+}
+
+.organization-table tbody tr:hover td,
+.members-table tbody tr:hover td {
+  background: var(--color-bg-muted);
+}
+
+.organizations-empty,
+.members-empty {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.organization-status,
+.member-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.organization-status--success,
+.member-badge--success {
+  color: var(--color-success);
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-success) 28%, transparent);
+}
+
+.organization-status--gray,
+.member-badge--gray {
+  color: var(--color-text-muted);
+  background: var(--color-bg-muted);
+  border-color: var(--color-border-soft);
+}
+
+.organization-status--danger {
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  border-color: color-mix(in srgb, var(--color-danger) 28%, transparent);
+}
+
+.member-badge--warning,
+.member-badge--info {
+  color: var(--color-warning);
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-warning) 28%, transparent);
+}
+
 .data-page__message {
   margin: 0;
   color: var(--color-danger);

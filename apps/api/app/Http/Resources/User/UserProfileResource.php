@@ -23,6 +23,7 @@ class UserProfileResource extends JsonResource
             'email' => $this->whenLoaded('user', fn (): ?string => $this->user?->email),
             'display_name' => $this->display_name,
             'avatar_url' => $this->getFirstMediaUrl('avatar') ?: null,
+            'banner_url' => $this->getFirstMediaUrl('banner') ?: null,
             'birthday' => $this->birthday?->toDateString(),
             'is_public' => $this->is_public,
             'show_online_status' => $this->show_online_status,

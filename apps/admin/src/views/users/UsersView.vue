@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Ban, Eye, RotateCcw, Trash2 } from '@lucide/vue'
+import { Ban, Eye, RotateCcw, Snowflake, Trash2 } from '@lucide/vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import DataTable from '@/components/data/DataTable.vue'
 import DataToolbar from '@/components/data/DataToolbar.vue'
@@ -10,8 +10,10 @@ import type { DataColumn } from '@/shared/data/table'
 import {
   blockUser,
   fetchUsers,
+  freezeUser,
   softDeleteUser,
   unblockUser,
+  unfreezeUser,
   type UserListItem,
 } from '@/shared/users/users'
 
@@ -30,6 +32,7 @@ const isLoading = ref(false)
 const actionUserId = ref<number | null>(null)
 const message = ref('')
 const pendingBlockUser = ref<Record<string, unknown> | null>(null)
+const pendingFreezeUser = ref<Record<string, unknown> | null>(null)
 const pendingDeleteUser = ref<Record<string, unknown> | null>(null)
 
 const columns = ref<DataColumn[]>([
@@ -198,6 +201,20 @@ function unblock(row: Record<string, unknown>): void {
   void runUserAction(
     userId,
     () => unblockUser(userId),
+    'Пользователь разблокирован.',
+  )
+}
+
+function freeze(row: Record<string, unknown>): void {
+  pendingFreezeUser.value = row
+}
+
+function unfreeze(row: Record<string, unknown>): void {
+  const userId = Number(row.id)
+
+  void runUserAction(
+    userId,
+    () => unfreezeUser(userId),
     'Пользователь разморожен.',
   )
 }
@@ -212,6 +229,14 @@ function closeBlockModal(): void {
   }
 
   pendingBlockUser.value = null
+}
+
+function closeFreezeModal(): void {
+  if (actionUserId.value !== null) {
+    return
+  }
+
+  pendingFreezeUser.value = null
 }
 
 function closeDeleteModal(): void {
@@ -239,6 +264,9 @@ const deleteModalDescription = computed(() => (
 const blockModalDescription = computed(() => (
   `Пользователь ${deleteUserName(pendingBlockUser.value)} будет заблокирован и потеряет доступ к активным возможностям аккаунта.`
 ))
+const freezeModalDescription = computed(() => (
+  `Пользователь ${deleteUserName(pendingFreezeUser.value)} будет заморожен и потеряет доступ к активным возможностям аккаунта.`
+))
 
 function confirmBlock(): void {
   if (!pendingBlockUser.value) {
@@ -255,6 +283,23 @@ function confirmBlock(): void {
   )
 
   pendingBlockUser.value = null
+}
+
+function confirmFreeze(): void {
+  if (!pendingFreezeUser.value) {
+    return
+  }
+
+  const row = pendingFreezeUser.value
+  const userId = Number(row.id)
+
+  void runUserAction(
+    userId,
+    () => freezeUser(userId),
+    'Пользователь заморожен.',
+  )
+
+  pendingFreezeUser.value = null
 }
 
 function confirmSoftDelete(): void {
@@ -450,19 +495,19 @@ onMounted(() => {
               </RouterLink>
 
               <button
-                v-if="row.status !== 'active'"
+                v-if="row.status === 'blocked'"
                 class="data-table__icon-action"
                 type="button"
                 :disabled="actionUserId === Number(row.id)"
-                aria-label="Разморозить пользователя"
-                title="Разморозить пользователя"
+                aria-label="Разблокировать пользователя"
+                title="Разблокировать пользователя"
                 @click="unblock(row)"
               >
                 <RotateCcw :size="17" :stroke-width="1.9" aria-hidden="true" />
               </button>
 
               <button
-                v-else
+                v-if="row.status !== 'blocked'"
                 class="data-table__icon-action"
                 type="button"
                 :disabled="actionUserId === Number(row.id)"
@@ -471,6 +516,30 @@ onMounted(() => {
                 @click="block(row)"
               >
                 <Ban :size="17" :stroke-width="1.9" aria-hidden="true" />
+              </button>
+
+              <button
+                v-if="row.status === 'active'"
+                class="data-table__icon-action"
+                type="button"
+                :disabled="actionUserId === Number(row.id)"
+                aria-label="Заморозить пользователя"
+                title="Заморозить пользователя"
+                @click="freeze(row)"
+              >
+                <Snowflake :size="17" :stroke-width="1.9" aria-hidden="true" />
+              </button>
+
+              <button
+                v-if="row.status === 'suspended'"
+                class="data-table__icon-action"
+                type="button"
+                :disabled="actionUserId === Number(row.id)"
+                aria-label="Разморозить пользователя"
+                title="Разморозить пользователя"
+                @click="unfreeze(row)"
+              >
+                <RotateCcw :size="17" :stroke-width="1.9" aria-hidden="true" />
               </button>
 
               <button
@@ -502,6 +571,17 @@ onMounted(() => {
       :loading="actionUserId !== null"
       @cancel="closeBlockModal"
       @confirm="confirmBlock"
+    />
+
+    <BlockModal
+      :open="pendingFreezeUser !== null"
+      title="Заморозить пользователя?"
+      :description="freezeModalDescription"
+      icon="snowflake"
+      confirm-text="Заморозить"
+      :loading="actionUserId !== null"
+      @cancel="closeFreezeModal"
+      @confirm="confirmFreeze"
     />
 
     <DeleteModal
@@ -553,7 +633,7 @@ onMounted(() => {
 
 .user-filters__choice-row {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(230px, 320px));
   gap: 10px;
 }
 
@@ -595,8 +675,13 @@ onMounted(() => {
 
 .filter-choice-group__options {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
 }
 
 .filter-choice-group--compact {

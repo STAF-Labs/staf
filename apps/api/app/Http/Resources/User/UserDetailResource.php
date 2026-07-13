@@ -28,6 +28,10 @@ class UserDetailResource extends JsonResource
                 'userProfile',
                 fn (): ?string => $this->userProfile?->getFirstMediaUrl('avatar') ?: null,
             ),
+            'banner_url' => $this->whenLoaded(
+                'userProfile',
+                fn (): ?string => $this->userProfile?->getFirstMediaUrl('banner') ?: null,
+            ),
             'email_verified_at' => $this->email_verified_at?->toISOString(),
             'last_seen_at' => $this->last_seen_at?->toISOString(),
             'created_at' => $this->created_at?->toISOString(),
@@ -35,6 +39,7 @@ class UserDetailResource extends JsonResource
                 'id' => $this->userProfile->id,
                 'display_name' => $this->userProfile->display_name,
                 'avatar_url' => $this->userProfile->getFirstMediaUrl('avatar') ?: null,
+                'banner_url' => $this->userProfile->getFirstMediaUrl('banner') ?: null,
                 'bio' => $this->userProfile->bio,
                 'website_urls' => $this->userProfile->website_urls,
                 'birthday' => $this->userProfile->birthday?->toDateString(),

@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { Ban } from '@lucide/vue'
+import { Ban, Snowflake } from '@lucide/vue'
 
 withDefaults(defineProps<{
   open: boolean
   title: string
   description: string
+  icon?: 'ban' | 'snowflake'
   cancelText?: string
   confirmText?: string
   loading?: boolean
 }>(), {
+  icon: 'ban',
   cancelText: 'Отмена',
   confirmText: 'Заблокировать',
   loading: false,
@@ -33,7 +35,8 @@ const emit = defineEmits<{
       >
         <div class="modal__content">
           <div class="modal__icon block-modal__icon" aria-hidden="true">
-            <Ban :size="34" :stroke-width="1.9" />
+            <Snowflake v-if="icon === 'snowflake'" :size="34" :stroke-width="1.9" />
+            <Ban v-else :size="34" :stroke-width="1.9" />
           </div>
 
           <div class="modal__copy">

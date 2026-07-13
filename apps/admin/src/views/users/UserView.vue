@@ -7,11 +7,13 @@ import DeleteModal from '@/components/ui/DeleteModal.vue'
 import {
   blockUser,
   fetchUser,
+  freezeUser,
   softDeleteUser,
   unblockUser,
+  unfreezeUser,
   type UserDetail,
 } from '@/shared/users/users'
-import { ArrowLeft, Ban, RotateCcw, Trash2 } from '@lucide/vue'
+import { ArrowLeft, Ban, RotateCcw, Snowflake, Trash2 } from '@lucide/vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -19,6 +21,7 @@ const user = ref<UserDetail | null>(null)
 const isLoading = ref(false)
 const isActionLoading = ref(false)
 const isBlockModalOpen = ref(false)
+const isFreezeModalOpen = ref(false)
 const isDeleteModalOpen = ref(false)
 const message = ref('')
 
@@ -43,11 +46,24 @@ const statusColorClass = computed(() => {
 
   return `profile-status--${color}`
 })
+const bannerUrl = computed(() => user.value?.banner_url || user.value?.profile?.banner_url || null)
+const heroClasses = computed(() => ({
+  'profile-hero': true,
+  'profile-hero--with-banner': bannerUrl.value !== null,
+}))
+const heroStyle = computed(() => (
+  bannerUrl.value === null
+    ? undefined
+    : { backgroundImage: `url("${bannerUrl.value}")` }
+))
 const deleteModalDescription = computed(() => (
   `Пользователь ${title.value} будет удален. Это действие скроет его из рабочего списка.`
 ))
 const blockModalDescription = computed(() => (
   `Пользователь ${title.value} будет заблокирован и потеряет доступ к активным возможностям аккаунта.`
+))
+const freezeModalDescription = computed(() => (
+  `Пользователь ${title.value} будет заморожен и потеряет доступ к активным возможностям аккаунта.`
 ))
 
 function formatDate(value: string | null, withTime = true): string {
@@ -170,6 +186,50 @@ function unblock(): void {
 
   void runUserAction(
     () => unblockUser(userId),
+    'Пользователь разблокирован.',
+  )
+}
+
+function freeze(): void {
+  if (!user.value) {
+    return
+  }
+
+  isFreezeModalOpen.value = true
+}
+
+function closeFreezeModal(): void {
+  if (isActionLoading.value) {
+    return
+  }
+
+  isFreezeModalOpen.value = false
+}
+
+function confirmFreeze(): void {
+  if (!user.value) {
+    return
+  }
+
+  const userId = user.value.id
+
+  void runUserAction(
+    () => freezeUser(userId),
+    'Пользователь заморожен.',
+  )
+
+  isFreezeModalOpen.value = false
+}
+
+function unfreeze(): void {
+  if (!user.value) {
+    return
+  }
+
+  const userId = user.value.id
+
+  void runUserAction(
+    () => unfreezeUser(userId),
     'Пользователь разморожен.',
   )
 }
@@ -228,7 +288,7 @@ onMounted(() => {
       </div>
 
       <template v-else-if="user">
-        <header class="profile-hero">
+        <header :class="heroClasses" :style="heroStyle">
           <RouterLink
             class="profile-hero__back"
             :to="{ name: 'users.index' }"
@@ -269,18 +329,18 @@ onMounted(() => {
 
             <div class="profile-hero__actions">
               <button
-                v-if="user.status !== 'active'"
+                v-if="user.status === 'blocked'"
                 class="profile-action"
                 type="button"
                 :disabled="isActionLoading"
                 @click="unblock"
               >
                 <RotateCcw :size="17" :stroke-width="1.9" aria-hidden="true" />
-                <span>Разморозить</span>
+                <span>Разблокировать</span>
               </button>
 
               <button
-                v-else
+                v-if="user.status !== 'blocked'"
                 class="profile-action"
                 type="button"
                 :disabled="isActionLoading"
@@ -288,6 +348,28 @@ onMounted(() => {
               >
                 <Ban :size="17" :stroke-width="1.9" aria-hidden="true" />
                 <span>Заблокировать</span>
+              </button>
+
+              <button
+                v-if="user.status === 'active'"
+                class="profile-action"
+                type="button"
+                :disabled="isActionLoading"
+                @click="freeze"
+              >
+                <Snowflake :size="17" :stroke-width="1.9" aria-hidden="true" />
+                <span>Заморозить</span>
+              </button>
+
+              <button
+                v-if="user.status === 'suspended'"
+                class="profile-action"
+                type="button"
+                :disabled="isActionLoading"
+                @click="unfreeze"
+              >
+                <RotateCcw :size="17" :stroke-width="1.9" aria-hidden="true" />
+                <span>Разморозить</span>
               </button>
 
               <button
@@ -446,6 +528,17 @@ onMounted(() => {
       @confirm="confirmBlock"
     />
 
+    <BlockModal
+      :open="isFreezeModalOpen"
+      title="Заморозить пользователя?"
+      :description="freezeModalDescription"
+      icon="snowflake"
+      confirm-text="Заморозить"
+      :loading="isActionLoading"
+      @cancel="closeFreezeModal"
+      @confirm="confirmFreeze"
+    />
+
     <DeleteModal
       :open="isDeleteModalOpen"
       title="Удалить пользователя?"
@@ -474,6 +567,9 @@ onMounted(() => {
 }
 
 .profile-hero {
+  position: relative;
+  isolation: isolate;
+
   display: grid;
   grid-template-columns: auto auto 1fr;
   align-items: center;
@@ -492,6 +588,28 @@ onMounted(() => {
   border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
+}
+
+.profile-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+
+  background: var(--color-surface);
+  border-radius: inherit;
+}
+
+.profile-hero--with-banner {
+  overflow: hidden;
+  background-position: center;
+  background-size: cover;
+}
+
+.profile-hero--with-banner::before {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--color-surface) 94%, transparent), color-mix(in srgb, var(--color-surface) 70%, transparent) 52%, color-mix(in srgb, var(--color-surface) 34%, transparent)),
+    linear-gradient(0deg, color-mix(in srgb, var(--color-surface) 42%, transparent), color-mix(in srgb, var(--color-surface) 42%, transparent));
 }
 
 .profile-hero__back {
@@ -779,86 +897,6 @@ onMounted(() => {
 
   color: var(--color-text-muted);
   line-height: 1.6;
-}
-
-.organization-table {
-  overflow-x: auto;
-}
-
-.organization-table table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.organization-table th,
-.organization-table td {
-  padding: 12px 10px;
-  text-align: left;
-  white-space: nowrap;
-}
-
-.organization-table th {
-  color: var(--color-text-soft);
-  font-size: 12px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.organization-table td {
-  color: var(--color-text);
-  font-size: 14px;
-}
-
-.organization-table tbody tr {
-  border-top: 1px solid var(--color-border-soft);
-}
-
-.organization-table tbody tr:hover td {
-  background: var(--color-bg-muted);
-}
-
-.organization-status {
-  display: inline-flex;
-  align-items: center;
-
-  min-height: 26px;
-  padding: 0 10px;
-
-  border: 1px solid transparent;
-  border-radius: 999px;
-
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.organization-status--success {
-  color: var(--color-success);
-  background: color-mix(in srgb, var(--color-success) 12%, transparent);
-  border-color: color-mix(in srgb, var(--color-success) 28%, transparent);
-}
-
-.organization-status--gray {
-  color: var(--color-text-muted);
-  background: var(--color-bg-muted);
-  border-color: var(--color-border-soft);
-}
-
-.organization-status--danger {
-  color: var(--color-danger);
-  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
-  border-color: color-mix(in srgb, var(--color-danger) 28%, transparent);
-}
-
-.organizations-empty {
-  display: grid;
-  place-items: center;
-
-  min-height: 120px;
-
-  color: var(--color-text);
-  font-size: 15px;
-  font-weight: 800;
-  text-align: center;
 }
 
 .account-list {

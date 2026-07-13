@@ -133,6 +133,28 @@ class UserController extends Controller
         );
     }
 
+    public function freeze(Request $request, User $user): JsonResponse
+    {
+        $user->forceFill([
+            'status' => CommonStatus::SUSPENDED,
+        ])->save();
+
+        return response()->json(
+            UserDetailResource::make($user->load(['memberOf.inOrganization', 'userProfile.media']))->resolve($request)
+        );
+    }
+
+    public function unfreeze(Request $request, User $user): JsonResponse
+    {
+        $user->forceFill([
+            'status' => CommonStatus::ACTIVE,
+        ])->save();
+
+        return response()->json(
+            UserDetailResource::make($user->load(['memberOf.inOrganization', 'userProfile.media']))->resolve($request)
+        );
+    }
+
     public function destroy(User $user): JsonResponse
     {
         $user->delete();

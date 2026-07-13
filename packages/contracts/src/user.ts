@@ -13,6 +13,7 @@ export type UserListItem = {
   status_color: string | null
   display_name: string | null
   avatar_url: string | null
+  banner_url: string | null
   birthday: string | null
   is_public: boolean | null
   show_online_status: boolean | null
@@ -27,6 +28,7 @@ export type UserDetail = UserListItem & {
     id: number
     display_name: string | null
     avatar_url: string | null
+    banner_url: string | null
     bio: unknown
     website_urls: unknown
     birthday: string | null

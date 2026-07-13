@@ -49,6 +49,18 @@ export async function unblockUser(id: number | string): Promise<UserDetail> {
   return response.data
 }
 
+export async function freezeUser(id: number | string): Promise<UserDetail> {
+  const response = await http.patch<UserDetail>(`/api/users/${id}/freeze`)
+
+  return response.data
+}
+
+export async function unfreezeUser(id: number | string): Promise<UserDetail> {
+  const response = await http.patch<UserDetail>(`/api/users/${id}/unfreeze`)
+
+  return response.data
+}
+
 export async function softDeleteUser(id: number | string): Promise<{ message: string }> {
   const response = await http.delete<{ message: string }>(`/api/users/${id}`)
 

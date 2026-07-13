@@ -28,6 +28,10 @@ class UserResource extends JsonResource
                 'userProfile',
                 fn (): ?string => $this->userProfile?->getFirstMediaUrl('avatar') ?: null,
             ),
+            'banner_url' => $this->whenLoaded(
+                'userProfile',
+                fn (): ?string => $this->userProfile?->getFirstMediaUrl('banner') ?: null,
+            ),
             'birthday' => $this->whenLoaded('userProfile', fn (): ?string => $this->userProfile?->birthday?->toDateString()),
             'is_public' => $this->whenLoaded('userProfile', fn (): ?bool => $this->userProfile?->is_public),
             'show_online_status' => $this->whenLoaded('userProfile', fn (): ?bool => $this->userProfile?->show_online_status),
