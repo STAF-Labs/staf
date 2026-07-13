@@ -2,8 +2,9 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { authLoaded, currentUser, fetchCurrentUser } from '../shared/auth/session'
 import DashboardView from '../views/dashboard/DashboardView.vue'
 import LoginView from '../views/auth/LoginView.vue'
-import UserProfilesView from '../views/users/UserProfilesView.vue'
 import UsersView from '../views/users/UsersView.vue'
+import OrganizationsView from '@/views/orgs/OrganizationsView.vue'
+import UserView from '@/views/users/UserView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -41,11 +42,24 @@ const router = createRouter({
     },
     {
       path: '/users/profiles',
-      name: 'users.profiles',
-      component: UserProfilesView,
+      redirect: { name: 'users.index' },
+    },
+    {
+      path: '/users/:id',
+      name: 'user.show',
+      component: UserView,
       meta: {
         requiresAuth: true,
-        title: 'Профили',
+        title: 'Пользователь',
+      },
+    },
+    {
+      path: '/organizations',
+      name: 'orgs.index',
+      component: OrganizationsView,
+      meta: {
+        requiresAuth: true,
+        title: 'Организации',
       },
     },
   ],

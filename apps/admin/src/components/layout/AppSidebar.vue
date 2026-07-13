@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ChevronDown, LayoutDashboard, PanelLeftClose, PanelLeftOpen, UserRound, Users } from '@lucide/vue'
+import { ChevronDown, PanelLeftClose, PanelLeftOpen } from '@lucide/vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import ThemeToggler from '@/components/ui/ThemeToggler.vue'
+import { sidebarItems, type SidebarGroupItem } from '@/shared/nav/sidebar'
 import logoUrl from '@staf/assets/images/logo.svg'
 
 defineProps<{
@@ -14,40 +15,37 @@ const emit = defineEmits<{
 }>()
 
 const route = useRoute()
-const usersGroupStorageKey = 'app-sidebar.users-group-open'
-const isUsersGroupOpen = ref(localStorage.getItem(usersGroupStorageKey) !== 'false')
 
-const navigationItems = [
-  {
-    label: 'Главная',
-    routeName: 'dashboard',
-    icon: LayoutDashboard,
-  },
-]
+const openedGroupsStorageKey = 'app-sidebar.opened-groups'
 
-const usersNavigationItems = [
-  {
-    label: 'Пользователи',
-    routeName: 'users.index',
-    icon: Users,
-  },
-  {
-    label: 'Профили',
-    routeName: 'users.profiles',
-    icon: UserRound,
-  },
-]
+const openedGroups = ref<Record<string, boolean>>(
+  JSON.parse(localStorage.getItem(openedGroupsStorageKey) ?? '{}'),
+)
 
-const isUsersGroupActive = computed(() => usersNavigationItems.some((item) => item.routeName === route.name))
+const activeRouteName = computed(() => String(route.name ?? ''))
 
-function toggleUsersGroup(): void {
-  isUsersGroupOpen.value = !isUsersGroupOpen.value
+function isGroupOpen(key: string): boolean {
+  return openedGroups.value[key] ?? true
 }
 
-watch(isUsersGroupOpen, (isOpen) => {
-  localStorage.setItem(usersGroupStorageKey, String(isOpen))
-})
+function toggleGroup(key: string): void {
+  openedGroups.value = {
+    ...openedGroups.value,
+    [key]: !isGroupOpen(key),
+  }
+}
 
+function isGroupActive(group: SidebarGroupItem): boolean {
+  return group.children.some((child) => child.routeName === activeRouteName.value)
+}
+
+watch(
+  openedGroups,
+  (value) => {
+    localStorage.setItem(openedGroupsStorageKey, JSON.stringify(value))
+  },
+  { deep: true },
+)
 </script>
 
 <template>
@@ -58,40 +56,48 @@ watch(isUsersGroupOpen, (isOpen) => {
     </div>
 
     <nav class="app-sidebar__nav" aria-label="Основная навигация">
-      <RouterLink
-        v-for="item in navigationItems"
-        :key="item.routeName"
-        class="app-sidebar__link"
-        :to="{ name: item.routeName }"
-      >
-        <component :is="item.icon" class="app-sidebar__link-icon" :size="20" :stroke-width="1.9" />
-        <span class="app-sidebar__link-label">{{ item.label }}</span>
-      </RouterLink>
-
-      <div class="app-sidebar__group" :class="{ 'is-open': isUsersGroupOpen, 'is-active': isUsersGroupActive }">
-        <button
-          type="button"
-          class="app-sidebar__link app-sidebar__group-trigger"
-          :aria-expanded="isUsersGroupOpen"
-          @click="toggleUsersGroup"
+      <template v-for="item in sidebarItems" :key="item.type === 'group' ? item.key : item.routeName">
+        <RouterLink
+          v-if="item.type === 'link'"
+          class="app-sidebar__link"
+          :to="{ name: item.routeName }"
         >
-          <Users class="app-sidebar__link-icon" :size="20" :stroke-width="1.9" />
-          <span class="app-sidebar__link-label">Пользователи</span>
-          <ChevronDown class="app-sidebar__group-chevron" :size="16" :stroke-width="2" />
-        </button>
+          <component :is="item.icon" class="app-sidebar__link-icon" :size="20" :stroke-width="1.9" />
+          <span class="app-sidebar__link-label">{{ item.label }}</span>
+        </RouterLink>
 
-        <div v-if="isUsersGroupOpen" class="app-sidebar__subnav">
-          <RouterLink
-            v-for="item in usersNavigationItems"
-            :key="item.routeName"
-            class="app-sidebar__sublink"
-            :to="{ name: item.routeName }"
+        <div
+          v-else
+          class="app-sidebar__group"
+          :class="{
+            'is-open': isGroupOpen(item.key),
+            'is-active': isGroupActive(item),
+          }"
+        >
+          <button
+            type="button"
+            class="app-sidebar__link app-sidebar__group-trigger"
+            :aria-expanded="isGroupOpen(item.key)"
+            @click="toggleGroup(item.key)"
           >
-            <component :is="item.icon" class="app-sidebar__sublink-icon" :size="16" :stroke-width="1.9" />
-            <span class="app-sidebar__sublink-label">{{ item.label }}</span>
-          </RouterLink>
+            <component :is="item.icon" class="app-sidebar__link-icon" :size="20" :stroke-width="1.9" />
+            <span class="app-sidebar__link-label">{{ item.label }}</span>
+            <ChevronDown class="app-sidebar__group-chevron" :size="16" :stroke-width="2" />
+          </button>
+
+          <div v-if="isGroupOpen(item.key)" class="app-sidebar__subnav">
+            <RouterLink
+              v-for="child in item.children"
+              :key="child.routeName"
+              class="app-sidebar__sublink"
+              :to="{ name: child.routeName }"
+            >
+              <component :is="child.icon" class="app-sidebar__sublink-icon" :size="16" :stroke-width="1.9" />
+              <span class="app-sidebar__sublink-label">{{ child.label }}</span>
+            </RouterLink>
+          </div>
         </div>
-      </div>
+      </template>
     </nav>
 
     <div class="app-sidebar__footer">
