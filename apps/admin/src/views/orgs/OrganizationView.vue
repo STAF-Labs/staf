@@ -103,6 +103,7 @@ async function loadOrganization(): Promise<void> {
 
   try {
     organization.value = await fetchOrganization(String(route.params.id))
+    route.meta.breadcrumbLabel = organization.value.name
   } catch {
     message.value = 'Не удалось загрузить организацию.'
   } finally {

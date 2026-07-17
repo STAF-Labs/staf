@@ -113,6 +113,7 @@ async function loadUser(): Promise<void> {
 
   try {
     user.value = await fetchUser(String(route.params.id))
+    route.meta.breadcrumbLabel = title.value
   } catch {
     message.value = 'Не удалось загрузить пользователя.'
   } finally {
