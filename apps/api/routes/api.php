@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\Game\GameController;
 use App\Http\Controllers\Api\Admin\Org\OrganizationController;
 use App\Http\Controllers\Api\Admin\User\UserController;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -11,6 +12,12 @@ Route::get('/user', function (Request $request): ?Authenticatable {
 })->middleware('auth:sanctum');
 
 Route::middleware('auth:sanctum')->group(function (): void {
+    Route::get('/games', [GameController::class, 'index']);
+    Route::post('/games', [GameController::class, 'store']);
+    Route::get('/games/{game}', [GameController::class, 'show']);
+    Route::patch('/games/{game}', [GameController::class, 'update']);
+    Route::delete('/games/{game}', [GameController::class, 'destroy']);
+
     Route::get('/organizations', [OrganizationController::class, 'index']);
     Route::get('/organizations/{organization}', [OrganizationController::class, 'show']);
     Route::patch('/organizations/{organization}/block', [OrganizationController::class, 'block']);

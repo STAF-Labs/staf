@@ -55,10 +55,5 @@ class Game extends Model implements HasMedia
             ->acceptsFile(
                 fn (File $file): bool => str_starts_with($file->mimeType, 'image/')
             )->singleFile();
-
-        $this->addMediaCollection('screenshots')
-            ->acceptsFile(
-                fn (File $file): bool => str_starts_with($file->mimeType, 'image/')
-            );
     }
 }

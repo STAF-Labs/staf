@@ -41,6 +41,7 @@ apps/api/bootstrap/cache/*.php
 !apps/api/storage/logs/.gitignore
 
 # Vendors / generated public links
+apps/api/public/storage
 apps/api/public/storage/
 
 # Logs
