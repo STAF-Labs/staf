@@ -3,6 +3,9 @@ import { authLoaded, currentUser, fetchCurrentUser } from '../shared/auth/sessio
 import DashboardView from '../views/dashboard/DashboardView.vue'
 import LoginView from '../views/auth/LoginView.vue'
 import UsersView from '../views/users/UsersView.vue'
+import GameFormView from '@/views/games/GameFormView.vue'
+import GameView from '@/views/games/GameView.vue'
+import GamesView from '@/views/games/GamesView.vue'
 import OrganizationsView from '@/views/orgs/OrganizationsView.vue'
 import OrganizationView from '@/views/orgs/OrganizationView.vue'
 import UserView from '@/views/users/UserView.vue'
@@ -28,6 +31,9 @@ const router = createRouter({
       name: 'dashboard',
       component: DashboardView,
       meta: {
+        breadcrumb: {
+          label: 'Главная',
+        },
         requiresAuth: true,
         title: 'Главная',
       },
@@ -37,6 +43,10 @@ const router = createRouter({
       name: 'users.index',
       component: UsersView,
       meta: {
+        breadcrumb: {
+          label: 'Пользователи',
+          parentName: 'dashboard',
+        },
         requiresAuth: true,
         title: 'Пользователи',
       },
@@ -50,8 +60,61 @@ const router = createRouter({
       name: 'user.show',
       component: UserView,
       meta: {
+        breadcrumb: {
+          parentName: 'users.index',
+        },
         requiresAuth: true,
         title: 'Пользователь',
+      },
+    },
+    {
+      path: '/games',
+      name: 'games.index',
+      component: GamesView,
+      meta: {
+        breadcrumb: {
+          label: 'Игры',
+          parentName: 'dashboard',
+        },
+        requiresAuth: true,
+        title: 'Игры',
+      },
+    },
+    {
+      path: '/games/create',
+      name: 'games.create',
+      component: GameFormView,
+      meta: {
+        breadcrumb: {
+          label: 'Создание игры',
+          parentName: 'games.index',
+        },
+        requiresAuth: true,
+        title: 'Создание игры',
+      },
+    },
+    {
+      path: '/games/:id',
+      name: 'games.show',
+      component: GameView,
+      meta: {
+        breadcrumb: {
+          parentName: 'games.index',
+        },
+        requiresAuth: true,
+        title: 'Просмотр игры',
+      },
+    },
+    {
+      path: '/games/:id/edit',
+      name: 'games.edit',
+      component: GameFormView,
+      meta: {
+        breadcrumb: {
+          parentName: 'games.index',
+        },
+        requiresAuth: true,
+        title: 'Редактирование игры',
       },
     },
     {
@@ -59,6 +122,10 @@ const router = createRouter({
       name: 'orgs.index',
       component: OrganizationsView,
       meta: {
+        breadcrumb: {
+          label: 'Организации',
+          parentName: 'dashboard',
+        },
         requiresAuth: true,
         title: 'Организации',
       },
@@ -68,6 +135,9 @@ const router = createRouter({
       name: 'org.show',
       component: OrganizationView,
       meta: {
+        breadcrumb: {
+          parentName: 'orgs.index',
+        },
         requiresAuth: true,
         title: 'Организация',
       },

@@ -1,6 +1,7 @@
 import type { Component } from 'vue'
 import {
   Building2,
+  Gamepad2,
   House,
   Users,
 } from '@lucide/vue'
@@ -34,6 +35,12 @@ export const sidebarItems: SidebarItem[] = [
     label: 'Пользователи',
     routeName: 'users.index',
     icon: Users,
+  },
+  {
+    type: 'link',
+    label: 'Игры',
+    routeName: 'games.index',
+    icon: Gamepad2,
   },
   {
     type: 'group',
