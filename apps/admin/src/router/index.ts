@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { authLoaded, currentUser, fetchCurrentUser } from '../shared/auth/session'
+import ContentTypesImportView from '@/views/content-types/ContentTypesImportView.vue'
+import ContentTypesView from '@/views/content-types/ContentTypesView.vue'
 import DashboardView from '../views/dashboard/DashboardView.vue'
 import LoginView from '../views/auth/LoginView.vue'
 import UsersView from '../views/users/UsersView.vue'
@@ -8,6 +10,8 @@ import GameView from '@/views/games/GameView.vue'
 import GamesView from '@/views/games/GamesView.vue'
 import OrganizationsView from '@/views/orgs/OrganizationsView.vue'
 import OrganizationView from '@/views/orgs/OrganizationView.vue'
+import ProjectFormView from '@/views/projects/ProjectFormView.vue'
+import ProjectsView from '@/views/projects/ProjectsView.vue'
 import UserView from '@/views/users/UserView.vue'
 
 const router = createRouter({
@@ -115,6 +119,70 @@ const router = createRouter({
         },
         requiresAuth: true,
         title: 'Редактирование игры',
+      },
+    },
+    {
+      path: '/projects',
+      name: 'projects.index',
+      component: ProjectsView,
+      meta: {
+        breadcrumb: {
+          label: 'Проекты',
+          parentName: 'dashboard',
+        },
+        requiresAuth: true,
+        title: 'Проекты',
+      },
+    },
+    {
+      path: '/content-types',
+      name: 'content-types.index',
+      component: ContentTypesView,
+      meta: {
+        breadcrumb: {
+          label: 'Типы контента',
+          parentName: 'dashboard',
+        },
+        requiresAuth: true,
+        title: 'Типы контента',
+      },
+    },
+    {
+      path: '/content-types/import',
+      name: 'content-types.import',
+      component: ContentTypesImportView,
+      meta: {
+        breadcrumb: {
+          label: 'Импорт из Excel',
+          parentName: 'content-types.index',
+        },
+        requiresAuth: true,
+        title: 'Импорт типов контента',
+      },
+    },
+    {
+      path: '/projects/create',
+      name: 'projects.create',
+      component: ProjectFormView,
+      meta: {
+        breadcrumb: {
+          label: 'Создание проекта',
+          parentName: 'projects.index',
+        },
+        requiresAuth: true,
+        title: 'Создание проекта',
+      },
+    },
+    {
+      path: '/projects/:id/edit',
+      name: 'projects.edit',
+      component: ProjectFormView,
+      meta: {
+        breadcrumb: {
+          parentName: 'projects.index',
+        },
+        requiresAuth: true,
+        title: 'Редактирование проекта',
       },
     },
     {

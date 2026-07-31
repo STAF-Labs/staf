@@ -1,7 +1,9 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\ContentType\ContentTypeController;
 use App\Http\Controllers\Api\Admin\Game\GameController;
 use App\Http\Controllers\Api\Admin\Org\OrganizationController;
+use App\Http\Controllers\Api\Admin\Project\ProjectController;
 use App\Http\Controllers\Api\Admin\User\UserController;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
@@ -17,6 +19,19 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/games/{game}', [GameController::class, 'show']);
     Route::patch('/games/{game}', [GameController::class, 'update']);
     Route::delete('/games/{game}', [GameController::class, 'destroy']);
+
+    Route::get('/content-types', [ContentTypeController::class, 'index']);
+    Route::post('/content-types', [ContentTypeController::class, 'store']);
+    Route::patch('/content-types/{contentType}', [ContentTypeController::class, 'update']);
+    Route::patch('/content-types/{contentType}/toggle-public', [ContentTypeController::class, 'togglePublic']);
+    Route::post('/content-types/import/validate', [ContentTypeController::class, 'validateImport']);
+    Route::post('/content-types/import', [ContentTypeController::class, 'import']);
+    Route::get('/game-content-types', [ProjectController::class, 'contentTypes']);
+    Route::get('/project-owner-options', [ProjectController::class, 'ownerOptions']);
+    Route::get('/projects', [ProjectController::class, 'index']);
+    Route::post('/projects', [ProjectController::class, 'store']);
+    Route::get('/projects/{project}', [ProjectController::class, 'show']);
+    Route::patch('/projects/{project}', [ProjectController::class, 'update']);
 
     Route::get('/organizations', [OrganizationController::class, 'index']);
     Route::get('/organizations/{organization}', [OrganizationController::class, 'show']);
