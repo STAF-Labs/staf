@@ -178,67 +178,6 @@
   border-color: color-mix(in srgb, var(--color-danger) 28%, transparent);
 }
 
-.game-editor {
-  display: grid;
-  overflow: hidden;
-  background: var(--color-bg-soft);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-
-.game-editor:focus-within {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-focus) 18%, transparent);
-}
-
-.game-editor__toolbar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 8px;
-  border-bottom: 1px solid var(--color-border-soft);
-}
-
-.game-editor__button {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  color: var(--color-text-muted);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.game-editor__button:hover,
-.game-editor__button.is-active {
-  color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
-  border-color: color-mix(in srgb, var(--color-primary) 24%, transparent);
-}
-
-.game-editor__body {
-  min-height: 220px;
-}
-
-.game-editor__body .ProseMirror {
-  min-height: 220px;
-  padding: 14px;
-  color: var(--color-text);
-  line-height: 1.55;
-  outline: none;
-}
-
-.game-editor__body .ProseMirror p {
-  margin: 0 0 10px;
-}
-
-.game-editor__body .ProseMirror p:last-child {
-  margin-bottom: 0;
-}
-
 .game-form-actions {
   display: flex;
   justify-content: space-between;

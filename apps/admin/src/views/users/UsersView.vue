@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { Ban, Eye, RotateCcw, Snowflake, Trash2 } from '@lucide/vue'
+import { Ban, Columns3, Eye, RotateCcw, Search, SlidersHorizontal, Snowflake, Trash2 } from '@lucide/vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import DataTable from '@/components/data/DataTable.vue'
-import DataToolbar from '@/components/data/DataToolbar.vue'
 import AppShell from '@/components/layout/AppShell.vue'
 import BlockModal from '@/components/ui/BlockModal.vue'
 import DeleteModal from '@/components/ui/DeleteModal.vue'
@@ -25,6 +24,9 @@ const isPublic = ref('')
 const showOnlineStatus = ref('')
 const showLastSeenAt = ref('')
 const deleted = ref('without')
+const pageSize = ref(20)
+const sort = ref<'username_asc' | 'username_desc' | 'created_at'>('username_asc')
+const advancedFiltersOpen = ref(false)
 const users = ref<UserListItem[]>([])
 const total = ref(0)
 const filteredTotal = ref(0)
@@ -65,6 +67,12 @@ const deletedOptions = [
   { value: 'only', label: 'Удалённые' },
   { value: 'without', label: 'Активные' },
 ]
+const pageSizeOptions = [10, 20, 30, 40, 50]
+const sortOptions = [
+  { value: 'username_asc', label: 'А-Я' },
+  { value: 'username_desc', label: 'Я-А' },
+  { value: 'created_at', label: 'Дата создания' },
+]
 
 const visibleColumns = computed(() => columns.value.filter((column) => column.visible))
 const tableColumns = computed<DataColumn[]>(() => [
@@ -81,7 +89,16 @@ const hasActiveFilters = computed(() => Boolean(
   || showLastSeenAt.value
   || deleted.value !== 'without',
 ))
-const rows = computed<Record<string, unknown>[]>(() => users.value.map((user) => ({
+const sortedUsers = computed<UserListItem[]>(() => [...users.value].sort((left, right) => {
+  if (sort.value === 'created_at') {
+    return timestamp(right.created_at) - timestamp(left.created_at)
+  }
+
+  const direction = sort.value === 'username_desc' ? -1 : 1
+
+  return direction * left.username.localeCompare(right.username, 'ru', { sensitivity: 'base' })
+}))
+const rows = computed<Record<string, unknown>[]>(() => sortedUsers.value.map((user) => ({
   ...user,
   avatar: user.avatar_url,
   birthday: formatDate(user.birthday, false),
@@ -95,6 +112,10 @@ const subtitle = computed(() => {
 
   return `Всего пользователей: ${total.value}.`
 })
+
+function timestamp(value: string | null): number {
+  return value ? new Date(value).getTime() : 0
+}
 
 function formatDate(value: string | null, withTime = true): string {
   if (!value) {
@@ -123,13 +144,6 @@ function statusColorClass(row: Record<string, unknown>): string {
   return `status-badge--${color}`
 }
 
-function filterChoiceClass(currentValue: string, optionValue: string): Record<string, boolean> {
-  return {
-    'filter-choice': true,
-    'filter-choice--active': currentValue === optionValue,
-  }
-}
-
 function toggleColumn(key: string): void {
   columns.value = columns.value.map((column) => (
     column.key === key ? { ...column, visible: !column.visible } : column
@@ -137,6 +151,7 @@ function toggleColumn(key: string): void {
 }
 
 function resetFilters(): void {
+  search.value = ''
   status.value = ''
   createdFrom.value = ''
   createdTo.value = ''
@@ -144,6 +159,10 @@ function resetFilters(): void {
   showOnlineStatus.value = ''
   showLastSeenAt.value = ''
   deleted.value = 'without'
+}
+
+function toggleAdvancedFilters(): void {
+  advancedFiltersOpen.value = !advancedFiltersOpen.value
 }
 
 async function loadUsers(): Promise<void> {
@@ -336,142 +355,132 @@ onMounted(() => {
         <p class="data-page__subtitle">{{ subtitle }}</p>
       </header>
 
-      <div class="data-toolbar-panel">
-        <DataToolbar
-          v-model:search="search"
-          :columns="columns"
-          @toggle-column="toggleColumn"
-        >
-          <template #filters>
-            <div class="user-filters">
-              <div class="user-filters__choice-row">
-                <div class="filter-choice-group">
-                  <span class="filter-choice-group__label">Статус</span>
-                  <div class="filter-choice-group__options">
-                    <button
-                      v-for="option in statusOptions"
-                      :key="option.value"
-                      type="button"
-                      :class="filterChoiceClass(status, option.value)"
-                      @click="status = option.value"
-                    >
-                      {{ option.label }}
-                    </button>
-                  </div>
-                </div>
+      <p v-if="message" class="data-page__message">{{ message }}</p>
 
-                <div class="filter-choice-group">
-                  <span class="filter-choice-group__label">Публичный профиль</span>
-                  <div class="filter-choice-group__options">
-                    <button
-                      v-for="option in booleanOptions"
-                      :key="option.value"
-                      type="button"
-                      :class="filterChoiceClass(isPublic, option.value)"
-                      @click="isPublic = option.value"
-                    >
-                      {{ option.label }}
-                    </button>
-                  </div>
-                </div>
+      <section class="game-filters" aria-label="Фильтры пользователей">
+        <div class="game-filter-top game-filter-top--with-actions">
+          <label class="game-filter-search">
+            <Search class="game-filter-search__icon" :size="18" :stroke-width="1.9" aria-hidden="true" />
+            <input
+              v-model="search"
+              class="game-filter-search__input"
+              type="search"
+              placeholder="Поиск"
+            >
+          </label>
 
-                <div class="filter-choice-group">
-                  <span class="filter-choice-group__label">Показывать онлайн</span>
-                  <div class="filter-choice-group__options">
-                    <button
-                      v-for="option in booleanOptions"
-                      :key="option.value"
-                      type="button"
-                      :class="filterChoiceClass(showOnlineStatus, option.value)"
-                      @click="showOnlineStatus = option.value"
-                    >
-                      {{ option.label }}
-                    </button>
-                  </div>
-                </div>
+          <button
+            class="game-filter-advanced"
+            :class="{ 'game-filter-advanced--active': advancedFiltersOpen }"
+            type="button"
+            title="Расширенные настройки"
+            :aria-pressed="advancedFiltersOpen"
+            @click="toggleAdvancedFilters"
+          >
+            <SlidersHorizontal :size="18" :stroke-width="1.9" aria-hidden="true" />
+            <span>Расширенные настройки</span>
+          </button>
 
-                <div class="filter-choice-group">
-                  <span class="filter-choice-group__label">Показывать был онлайн</span>
-                  <div class="filter-choice-group__options">
-                    <button
-                      v-for="option in booleanOptions"
-                      :key="option.value"
-                      type="button"
-                      :class="filterChoiceClass(showLastSeenAt, option.value)"
-                      @click="showLastSeenAt = option.value"
-                    >
-                      {{ option.label }}
-                    </button>
-                  </div>
-                </div>
-              </div>
+          <details class="data-toolbar__columns game-filter-columns">
+            <summary class="game-filter-advanced">
+              <Columns3 :size="18" :stroke-width="1.9" aria-hidden="true" />
+              <span>Колонки</span>
+            </summary>
 
-              <div class="user-filters__date-row">
-                <label class="filter-field">
-                  <span>Создан с</span>
-                  <input
-                    v-model="createdFrom"
-                    class="filter-field__control"
-                    type="date"
-                    :max="createdTo || undefined"
-                  >
-                </label>
-
-                <label class="filter-field">
-                  <span>Создан по</span>
-                  <input
-                    v-model="createdTo"
-                    class="filter-field__control"
-                    type="date"
-                    :min="createdFrom || undefined"
-                  >
-                </label>
-
-              </div>
-
-              <div class="user-filters__deleted-row">
-                <div class="filter-choice-group filter-choice-group--compact">
-                  <span class="filter-choice-group__label">Удаление</span>
-                  <div class="filter-choice-group__options">
-                    <button
-                      v-for="option in deletedOptions"
-                      :key="option.value"
-                      type="button"
-                      :class="filterChoiceClass(deleted, option.value)"
-                      @click="deleted = option.value"
-                    >
-                      {{ option.label }}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div class="user-filters__footer">
-                <button
-                  class="data-toolbar__button filter-field__button"
-                  type="button"
-                  title="Сбросить фильтр"
-                  :disabled="!hasActiveFilters"
-                  @click="resetFilters"
+            <div class="data-toolbar__columns-menu">
+              <label v-for="column in columns" :key="column.key" class="data-toolbar__column-option">
+                <input
+                  class="checkbox-control"
+                  type="checkbox"
+                  :checked="column.visible"
+                  @change="toggleColumn(column.key)"
                 >
-                  <Trash2 aria-hidden="true" style="color: var(--color-danger)" />
-                  <span>Сбросить фильтр</span>
-                </button>
-              </div>
+                <span>{{ column.label }}</span>
+              </label>
             </div>
-          </template>
-        </DataToolbar>
-      </div>
+          </details>
+        </div>
 
-      <div class="data-table-panel">
-        <p v-if="message" class="data-page__message">{{ message }}</p>
+        <div class="game-filter-row game-filter-row--users">
+          <label class="game-filter-field">
+            <span class="game-filter-field__label">Статус</span>
+            <select v-model="status" class="game-filter-field__control">
+              <option v-for="option in statusOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
 
-        <DataTable
-          :columns="tableColumns"
-          :rows="rows"
-          :loading="isLoading"
-          empty-text="Пользователи не найдены"
-        >
+          <label class="game-filter-field">
+            <span class="game-filter-field__label">Публичный профиль</span>
+            <select v-model="isPublic" class="game-filter-field__control">
+              <option v-for="option in booleanOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+
+          <label class="game-filter-field">
+            <span class="game-filter-field__label">Создан</span>
+            <span class="game-filter-date-range">
+              <input
+                v-model="createdFrom"
+                class="game-filter-date-range__input"
+                type="date"
+                :max="createdTo || undefined"
+                aria-label="Создан от"
+              >
+              <span class="game-filter-date-range__separator">-</span>
+              <input
+                v-model="createdTo"
+                class="game-filter-date-range__input"
+                type="date"
+                :min="createdFrom || undefined"
+                aria-label="Создан до"
+              >
+            </span>
+          </label>
+
+          <label class="game-filter-field">
+            <span class="game-filter-field__label">Показывать онлайн</span>
+            <select v-model="showOnlineStatus" class="game-filter-field__control">
+              <option v-for="option in booleanOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+
+          <label class="game-filter-field">
+            <span class="game-filter-field__label">Показывать был онлайн</span>
+            <select v-model="showLastSeenAt" class="game-filter-field__control">
+              <option v-for="option in booleanOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+
+          <button
+            class="game-filter-reset"
+            type="button"
+            :disabled="!hasActiveFilters"
+            title="Сбросить фильтры"
+            @click="resetFilters"
+          >
+            <RotateCcw :size="18" :stroke-width="1.9" aria-hidden="true" />
+            <span>Сбросить</span>
+          </button>
+        </div>
+      </section>
+
+      <div class="game-results-layout" :class="{ 'game-results-layout--with-panel': advancedFiltersOpen }">
+        <div class="data-table-panel">
+          <DataTable
+            :columns="tableColumns"
+            :rows="rows"
+            :loading="isLoading"
+            :page-size="pageSize"
+            empty-text="Пользователи не найдены"
+          >
           <template #cell-avatar="{ row }">
             <span class="user-avatar" aria-hidden="true">
               <img
@@ -560,7 +569,43 @@ onMounted(() => {
               {{ value }}
             </span>
           </template>
-        </DataTable>
+
+          </DataTable>
+        </div>
+
+        <aside
+          class="game-advanced-panel"
+          :class="{ 'game-advanced-panel--open': advancedFiltersOpen }"
+          :aria-hidden="!advancedFiltersOpen"
+          aria-label="Расширенные настройки"
+        >
+          <label class="game-filter-field">
+            <span class="game-filter-field__label">Сортировка</span>
+            <select v-model="sort" class="game-filter-field__control">
+              <option v-for="option in sortOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+
+          <label class="game-filter-field">
+            <span class="game-filter-field__label">Вид</span>
+            <select v-model="pageSize" class="game-filter-field__control">
+              <option v-for="option in pageSizeOptions" :key="option" :value="option">
+                {{ option }}
+              </option>
+            </select>
+          </label>
+
+          <label class="game-filter-field">
+            <span class="game-filter-field__label">Удаленные</span>
+            <select v-model="deleted" class="game-filter-field__control">
+              <option v-for="option in deletedOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+        </aside>
       </div>
     </section>
 
@@ -623,119 +668,6 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-}
-
-.user-filters {
-  display: grid;
-  gap: 14px;
-  width: 100%;
-}
-
-.user-filters__choice-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 320px));
-  gap: 10px;
-}
-
-.user-filters__date-row {
-  display: flex;
-  align-items: end;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.user-filters__deleted-row {
-  display: flex;
-}
-
-.user-filters__footer {
-  display: flex;
-  justify-content: flex-start;
-
-  padding-top: 12px;
-  border-top: 1px solid var(--color-border-soft);
-}
-
-.filter-choice-group {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-  padding: 10px;
-
-  background: var(--color-bg-soft);
-  border: 1px solid var(--color-border-soft);
-  border-radius: var(--radius-md);
-}
-
-.filter-choice-group__label {
-  color: var(--color-text-muted);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.filter-choice-group__options {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 6px;
-  max-width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding-bottom: 2px;
-  scrollbar-width: thin;
-}
-
-.filter-choice-group--compact {
-  width: fit-content;
-  min-width: min(100%, 260px);
-}
-
-.filter-choice {
-  min-height: 28px;
-  padding: 0 10px;
-
-  color: var(--color-text-muted);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-soft);
-  border-radius: 999px;
-  cursor: pointer;
-  white-space: nowrap;
-
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.filter-choice:hover {
-  color: var(--color-text);
-  background: var(--color-surface-hover);
-}
-
-.filter-choice--active {
-  color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-  border-color: color-mix(in srgb, var(--color-primary) 32%, transparent);
-}
-
-@media (max-width: 680px) {
-  .user-filters__choice-row {
-    grid-template-columns: 1fr;
-  }
-
-  .user-filters__date-row {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
-
-  .user-filters__deleted-row,
-  .filter-choice-group--compact,
-  .user-filters__footer,
-  .filter-field,
-  .filter-field__button {
-    width: 100%;
-  }
-
-  .user-filters__footer {
-    justify-content: flex-start;
-  }
 }
 
 .status-badge {
