@@ -217,5 +217,5 @@ Full startup runbook (backend via Laravel Sail, frontends via Vite): see
 is the current, verified guide (Linux is a placeholder for now). It covers the
 exact order (pnpm install → composer in a container → `docker compose build && up`
 → `migrate:fresh --seed` → Vite), the port map, the seeded admin login, and the
-known gotchas (admin must run on :5175 for CORS, Vite's IPv6-only bind, npm
+known gotchas (admin must run on :5174 for CORS, Vite's IPv6-only bind, npm
 `ECONNRESET` during the image build).

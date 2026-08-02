@@ -12,7 +12,7 @@ All commands are run from the repo root unless noted.
 |---|---|---|
 | API (`laravel.test`) | http://localhost | port **80** |
 | client | http://localhost:5173 | `FRONTEND_URL` |
-| admin | http://localhost:**5175** | `ADMIN_PANEL_URL` — **not 5174** (CORS, see gotchas) |
+| admin | http://localhost:**5174** | `ADMIN_PANEL_URL` |
 | pgsql | localhost:5433 → 5432 | |
 | redis | localhost:6379 | |
 | meilisearch | localhost:7701 | |
@@ -44,8 +44,8 @@ DB_DATABASE=laravel
 DB_USERNAME=sail
 DB_PASSWORD=password
 FRONTEND_URL=http://localhost:5173
-ADMIN_PANEL_URL=http://localhost:5175
-SANCTUM_STATEFUL_DOMAINS=localhost,localhost:5173,localhost:5174,localhost:5175,127.0.0.1,127.0.0.1:5173,127.0.0.1:5174,127.0.0.1:5175
+ADMIN_PANEL_URL=http://localhost:5174
+SANCTUM_STATEFUL_DOMAINS=localhost,localhost:5173,localhost:5174,127.0.0.1,127.0.0.1:5173,127.0.0.1:5174
 ```
 
 **3. PHP deps (vendor/) via container** — required before the Sail image build
@@ -70,30 +70,28 @@ docker compose exec laravel.test php artisan migrate:fresh --seed
 ```
 
 **6. Frontends on the host** — Vite binds IPv6-only by default here, so pass
-`--host 127.0.0.1`; pin admin to **5175**.
+`--host 127.0.0.1`; admin is pinned to **5174**.
 ```powershell
 # terminal 1 — client
 pnpm --filter @staf/client exec vite --host 127.0.0.1 --port 5173 --strictPort
-# terminal 2 — admin (MUST be 5175)
-pnpm --filter @staf/admin  exec vite --host 127.0.0.1 --port 5175 --strictPort
+# terminal 2 — admin (MUST be 5174)
+pnpm --filter @staf/admin  exec vite --host 127.0.0.1 --port 5174 --strictPort
 ```
 
 **7. Verify**
 ```powershell
 curl.exe -s -o NUL -w "api    -> %{http_code}`n" http://localhost/sanctum/csrf-cookie   # 204
 curl.exe -s -o NUL -w "client -> %{http_code}`n" http://localhost:5173/                  # 200
-curl.exe -s -o NUL -w "admin  -> %{http_code}`n" http://localhost:5175/                  # 200
+curl.exe -s -o NUL -w "admin  -> %{http_code}`n" http://localhost:5174/                  # 200
 ```
-Then open http://localhost:5175 and sign in with `admin@staf.ru` / `password`.
+Then open http://localhost:5174 and sign in with `admin@staf.ru` / `password`.
 
 ## Gotchas
 
-1. **Admin must run on :5175, or login fails.** `config/cors.php` only allows
-   origins `FRONTEND_URL` (5173) and `ADMIN_PANEL_URL` (5175). If Vite auto-picks
-   **5174** (client took 5173), the browser `Origin: localhost:5174` is blocked by
-   CORS and `/login` fails — even though curl "works". Always pass
-   `--port 5175 --strictPort`, or pin it in `apps/admin/vite.config.ts`:
-   `server: { host: '127.0.0.1', port: 5175, strictPort: true }`.
+1. **Admin must run on :5174, or login fails.** `config/cors.php` allows
+   origins `FRONTEND_URL` (5173) and `ADMIN_PANEL_URL` (5174). Always pass
+   `--port 5174 --strictPort`, or use the pinned config in `apps/admin/vite.config.ts`:
+   `server: { host: '127.0.0.1', port: 5174, strictPort: true }`.
 
 2. **Vite binds IPv6-only** on this setup — without `--host 127.0.0.1` the socket
    listens on `::1` and `localhost`/`127.0.0.1` are unreachable. Same `server.host`

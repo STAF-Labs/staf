@@ -17,7 +17,7 @@ return [
 
     'paths' => ['api/*', 'sanctum/csrf-cookie', 'login', 'logout'],
     'allowed_methods' => ['*'],
-    'allowed_origins' => [env('FRONTEND_URL', 'http://localhost:5173'), env('ADMIN_PANEL_URL', 'http://localhost:5175')],
+    'allowed_origins' => [env('FRONTEND_URL', 'http://localhost:5173'), env('ADMIN_PANEL_URL', 'http://localhost:5174')],
     'allowed_origins_patterns' => [],
     'allowed_headers' => ['*'],
     'exposed_headers' => [],
