@@ -69,6 +69,18 @@ export type ProjectContentTypeOption = {
   content_type_name: string | null
 }
 
+export type GameContentTypeListItem = {
+  id: number
+  game_id: number
+  content_type_id: number
+  content_type_name: string | null
+  content_type_slug: string | null
+  is_public: boolean | null
+  projects_count: number
+  filters_count: number
+  created_at: string | null
+}
+
 export type ProjectOwnerOption = {
   type: string
   id: number

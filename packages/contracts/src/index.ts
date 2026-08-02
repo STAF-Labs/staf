@@ -8,6 +8,7 @@ export type {
   ContentTypeImportRow,
   ContentTypeImportValidationResponse,
   ContentTypeListItem,
+  GameContentTypeListItem,
   ProjectContentTypeOption,
   ProjectDetail,
   ProjectListItem,

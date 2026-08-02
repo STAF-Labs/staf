@@ -14,14 +14,22 @@ return new class extends Migration
         Schema::create('dimensions', function (Blueprint $table) {
             $table->id();
 
+            $table->foreignId('game_content_type_id')->constrained('game_content_types')->cascadeOnDelete();
+
             $table->string('name', 64);
-            $table->string('slug', 100)->unique();
+            $table->string('slug', 100);
 
             $table->string('selection_mode')->default('single');
             $table->boolean('is_filterable')->default(true);
+            $table->boolean('is_required')->default(true);
             $table->boolean('is_active')->default(true);
+            $table->integer('sort_order')->default(0);
+
+            $table->jsonb('notes')->nullable();
 
             $table->timestampsTz();
+
+            $table->unique(['game_content_type_id', 'slug']);
         });
     }
 

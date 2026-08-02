@@ -3,6 +3,9 @@
 namespace Tests\Feature\Admin\Game;
 
 use App\Models\Game\Game;
+use App\Models\Game\ContentType\ContentType;
+use App\Models\Game\ContentType\GameContentType;
+use App\Models\Game\Project\Project;
 use App\Models\User\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -207,6 +210,164 @@ class GameStoreTest extends TestCase
 
         $this->assertSoftDeleted('games', [
             'id' => $game->id,
+        ]);
+    }
+
+    public function test_admin_can_attach_content_type_to_game(): void
+    {
+        $user = User::query()->create([
+            'username' => 'admin',
+            'email' => 'admin@example.com',
+            'password' => 'password',
+        ]);
+        $game = Game::query()->create([
+            'name' => 'Game',
+            'status' => 'active',
+        ]);
+        $contentType = ContentType::query()->create([
+            'name' => 'Мод',
+            'is_public' => true,
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->postJson("/api/games/{$game->id}/content-types", [
+                'content_type_id' => $contentType->id,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('game_id', $game->id)
+            ->assertJsonPath('content_type_id', $contentType->id)
+            ->assertJsonPath('content_type_name', 'Мод');
+
+        $this->assertDatabaseHas('game_content_types', [
+            'game_id' => $game->id,
+            'content_type_id' => $contentType->id,
+        ]);
+    }
+
+    public function test_admin_can_list_game_content_types(): void
+    {
+        $user = User::query()->create([
+            'username' => 'admin',
+            'email' => 'admin@example.com',
+            'password' => 'password',
+        ]);
+        $game = Game::query()->create([
+            'name' => 'Game',
+            'status' => 'active',
+        ]);
+        $contentType = ContentType::query()->create([
+            'name' => 'Карта',
+            'is_public' => true,
+        ]);
+        GameContentType::query()->create([
+            'game_id' => $game->id,
+            'content_type_id' => $contentType->id,
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->getJson("/api/games/{$game->id}/content-types")
+            ->assertOk()
+            ->assertJsonPath('total', 1)
+            ->assertJsonPath('data.0.content_type_name', 'Карта');
+    }
+
+    public function test_admin_cannot_attach_same_content_type_to_game_twice(): void
+    {
+        $user = User::query()->create([
+            'username' => 'admin',
+            'email' => 'admin@example.com',
+            'password' => 'password',
+        ]);
+        $game = Game::query()->create([
+            'name' => 'Game',
+            'status' => 'active',
+        ]);
+        $contentType = ContentType::query()->create([
+            'name' => 'Мод',
+            'is_public' => true,
+        ]);
+        GameContentType::query()->create([
+            'game_id' => $game->id,
+            'content_type_id' => $contentType->id,
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->postJson("/api/games/{$game->id}/content-types", [
+                'content_type_id' => $contentType->id,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['content_type_id']);
+    }
+
+    public function test_admin_can_detach_unused_content_type_from_game(): void
+    {
+        $user = User::query()->create([
+            'username' => 'admin',
+            'email' => 'admin@example.com',
+            'password' => 'password',
+        ]);
+        $game = Game::query()->create([
+            'name' => 'Game',
+            'status' => 'active',
+        ]);
+        $contentType = ContentType::query()->create([
+            'name' => 'Мод',
+            'is_public' => true,
+        ]);
+        $gameContentType = GameContentType::query()->create([
+            'game_id' => $game->id,
+            'content_type_id' => $contentType->id,
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->deleteJson("/api/games/{$game->id}/content-types/{$gameContentType->id}")
+            ->assertOk()
+            ->assertJsonPath('message', 'Тип контента отключен от игры.');
+
+        $this->assertDatabaseMissing('game_content_types', [
+            'id' => $gameContentType->id,
+        ]);
+    }
+
+    public function test_admin_cannot_detach_content_type_used_by_project(): void
+    {
+        $user = User::query()->create([
+            'username' => 'admin',
+            'email' => 'admin@example.com',
+            'password' => 'password',
+        ]);
+        $game = Game::query()->create([
+            'name' => 'Game',
+            'status' => 'active',
+        ]);
+        $contentType = ContentType::query()->create([
+            'name' => 'Мод',
+            'is_public' => true,
+        ]);
+        $gameContentType = GameContentType::query()->create([
+            'game_id' => $game->id,
+            'content_type_id' => $contentType->id,
+        ]);
+        Project::query()->create([
+            'ownerable_type' => User::class,
+            'ownerable_id' => $user->id,
+            'game_content_type_id' => $gameContentType->id,
+            'title' => 'Проект',
+            'description' => [],
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->deleteJson("/api/games/{$game->id}/content-types/{$gameContentType->id}")
+            ->assertConflict()
+            ->assertJsonPath('message', 'Нельзя удалить тип контента, который используется в проектах.');
+
+        $this->assertDatabaseHas('game_content_types', [
+            'id' => $gameContentType->id,
         ]);
     }
 

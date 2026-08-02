@@ -1,0 +1,227 @@
+<?php
+
+namespace App\Http\Controllers\Api\Admin\Game;
+
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\Game\CopyGameDimensionsRequest;
+use App\Http\Requests\Admin\Game\StoreGameDimensionRequest;
+use App\Http\Requests\Admin\Game\UpdateGameDimensionRequest;
+use App\Http\Resources\Game\Filter\DimensionResource;
+use App\Models\Game\ContentType\GameContentType;
+use App\Models\Game\Filter\Dimension;
+use App\Models\Game\Game;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+
+class GameDimensionController extends Controller
+{
+    public function index(Request $request, Game $game, GameContentType $gameContentType): JsonResponse
+    {
+        $this->ensureGameContentTypeBelongsToGame($game, $gameContentType);
+
+        $dimensions = $gameContentType->dimensions()
+            ->with(['values' => fn ($query) => $query->orderBy('sort_order')->orderBy('id')])
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+
+        return response()->json([
+            'data' => DimensionResource::collection($dimensions)->resolve($request),
+            'total' => $dimensions->count(),
+            'filtered_total' => $dimensions->count(),
+        ]);
+    }
+
+    public function store(
+        StoreGameDimensionRequest $request,
+        Game $game,
+        GameContentType $gameContentType
+    ): JsonResponse {
+        $this->ensureGameContentTypeBelongsToGame($game, $gameContentType);
+
+        $dimension = $gameContentType->dimensions()->create([
+            ...$request->validated(),
+            'sort_order' => ((int) $gameContentType->dimensions()->max('sort_order')) + 1,
+        ]);
+
+        return response()->json(
+            DimensionResource::make($dimension->refresh()->load('values'))->resolve($request),
+            201
+        );
+    }
+
+    public function copy(
+        CopyGameDimensionsRequest $request,
+        Game $game,
+        GameContentType $gameContentType
+    ): JsonResponse {
+        $this->ensureGameContentTypeBelongsToGame($game, $gameContentType);
+
+        $sourceGameContentType = $game->gameContentTypes()
+            ->findOrFail($request->integer('source_game_content_type_id'));
+        $dimensionIds = $request->validated('dimension_ids');
+        $sourceDimensions = $sourceGameContentType->dimensions()
+            ->whereKey($dimensionIds)
+            ->with(['values' => fn ($query) => $query->orderBy('sort_order')->orderBy('id')])
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+
+        $summary = DB::transaction(function () use ($gameContentType, $sourceDimensions): array {
+            $createdFilters = 0;
+            $reusedFilters = 0;
+            $createdValues = 0;
+            $skippedValues = 0;
+            $nextDimensionSortOrder = ((int) $gameContentType->dimensions()->max('sort_order')) + 1;
+
+            foreach ($sourceDimensions as $sourceDimension) {
+                $targetDimension = $gameContentType->dimensions()
+                    ->where('slug', $sourceDimension->slug)
+                    ->first();
+
+                if ($targetDimension === null) {
+                    $targetDimension = $gameContentType->dimensions()
+                        ->get()
+                        ->first(
+                            fn ($dimension): bool => $this->normalizedName($dimension->name) ===
+                                $this->normalizedName($sourceDimension->name)
+                        );
+                }
+
+                if ($targetDimension === null) {
+                    $targetDimension = $gameContentType->dimensions()->create([
+                        'name' => $sourceDimension->name,
+                        'slug' => $sourceDimension->slug,
+                        'selection_mode' => $sourceDimension->selection_mode->value,
+                        'is_filterable' => $sourceDimension->is_filterable,
+                        'is_required' => $sourceDimension->is_required,
+                        'is_active' => $sourceDimension->is_active,
+                        'sort_order' => $nextDimensionSortOrder,
+                        'notes' => $sourceDimension->notes,
+                    ]);
+                    $nextDimensionSortOrder++;
+                    $createdFilters++;
+                } else {
+                    $reusedFilters++;
+                }
+
+                $targetValues = $targetDimension->values()->get();
+                $targetValuesByName = $targetValues->keyBy(
+                    fn ($value): string => $this->normalizedName($value->name)
+                );
+                $sourceToTargetValueIds = [];
+                $createdSourceValueIds = [];
+                $nextValueSortOrder = ((int) $targetValues->max('sort_order')) + 1;
+
+                foreach ($sourceDimension->values as $sourceValue) {
+                    $normalizedName = $this->normalizedName($sourceValue->name);
+                    $targetValue = $targetValuesByName->get($normalizedName);
+
+                    if ($targetValue !== null) {
+                        $sourceToTargetValueIds[$sourceValue->id] = $targetValue->id;
+                        $skippedValues++;
+
+                        continue;
+                    }
+
+                    $targetValue = $targetDimension->values()->create([
+                        'name' => $sourceValue->name,
+                        'sort_order' => $nextValueSortOrder,
+                        'is_active' => $sourceValue->is_active,
+                    ]);
+                    $nextValueSortOrder++;
+                    $createdValues++;
+                    $createdSourceValueIds[] = $sourceValue->id;
+                    $sourceToTargetValueIds[$sourceValue->id] = $targetValue->id;
+                    $targetValuesByName->put($normalizedName, $targetValue);
+                }
+
+                foreach ($sourceDimension->values as $sourceValue) {
+                    if (
+                        $sourceValue->parent_id === null ||
+                        ! in_array($sourceValue->id, $createdSourceValueIds, true)
+                    ) {
+                        continue;
+                    }
+
+                    $parentId = $sourceToTargetValueIds[$sourceValue->parent_id] ?? null;
+
+                    if ($parentId !== null) {
+                        $targetDimension->values()
+                            ->whereKey($sourceToTargetValueIds[$sourceValue->id])
+                            ->update(['parent_id' => $parentId]);
+                    }
+                }
+            }
+
+            return [
+                'created_filters' => $createdFilters,
+                'reused_filters' => $reusedFilters,
+                'created_values' => $createdValues,
+                'skipped_values' => $skippedValues,
+            ];
+        });
+
+        $dimensions = $gameContentType->dimensions()
+            ->with(['values' => fn ($query) => $query->orderBy('sort_order')->orderBy('id')])
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get();
+
+        return response()->json([
+            ...$summary,
+            'data' => DimensionResource::collection($dimensions)->resolve($request),
+        ]);
+    }
+
+    public function update(
+        UpdateGameDimensionRequest $request,
+        Game $game,
+        GameContentType $gameContentType,
+        Dimension $dimension
+    ): JsonResponse {
+        $this->ensureDimensionBelongsToContext($game, $gameContentType, $dimension);
+        $dimension->update($request->validated());
+
+        return response()->json(
+            DimensionResource::make(
+                $dimension->refresh()->load(['values' => fn ($query) => $query
+                    ->orderBy('sort_order')
+                    ->orderBy('id')])
+            )->resolve($request)
+        );
+    }
+
+    public function destroy(
+        Game $game,
+        GameContentType $gameContentType,
+        Dimension $dimension
+    ): JsonResponse {
+        $this->ensureDimensionBelongsToContext($game, $gameContentType, $dimension);
+        $dimension->delete();
+
+        return response()->json(['message' => 'Фильтр удалён.']);
+    }
+
+    private function ensureGameContentTypeBelongsToGame(
+        Game $game,
+        GameContentType $gameContentType
+    ): void {
+        abort_unless($gameContentType->game_id === $game->id, 404);
+    }
+
+    private function ensureDimensionBelongsToContext(
+        Game $game,
+        GameContentType $gameContentType,
+        Dimension $dimension
+    ): void {
+        $this->ensureGameContentTypeBelongsToGame($game, $gameContentType);
+        abort_unless($dimension->game_content_type_id === $gameContentType->id, 404);
+    }
+
+    private function normalizedName(string $name): string
+    {
+        return mb_strtolower(trim($name), 'UTF-8');
+    }
+}

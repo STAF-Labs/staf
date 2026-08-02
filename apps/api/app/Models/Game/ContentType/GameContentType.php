@@ -2,7 +2,7 @@
 
 namespace App\Models\Game\ContentType;
 
-use App\Models\Game\Filter\GameContentTypeDimension;
+use App\Models\Game\Filter\Dimension;
 use App\Models\Game\Game;
 use App\Models\Game\Project\Project;
 use Illuminate\Database\Eloquent\Model;
@@ -41,7 +41,7 @@ class GameContentType extends Model
 
     public function dimensions(): HasMany
     {
-        return $this->hasMany(GameContentTypeDimension::class);
+        return $this->hasMany(Dimension::class);
     }
 
     public function projects(): HasMany
