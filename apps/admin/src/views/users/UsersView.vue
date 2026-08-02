@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { Ban, Columns3, Eye, RotateCcw, Search, SlidersHorizontal, Snowflake, Trash2 } from '@lucide/vue'
+import { Ban, Columns3, Eye, RotateCcw, SlidersHorizontal, Snowflake, Trash2 } from '@lucide/vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import DataTable from '@/components/data/DataTable.vue'
 import AppShell from '@/components/layout/AppShell.vue'
 import BlockModal from '@/components/ui/BlockModal.vue'
 import DeleteModal from '@/components/ui/DeleteModal.vue'
+import SearchField from '@/components/ui/SearchField.vue'
 import type { DataColumn } from '@/shared/data/table'
 import {
   blockUser,
@@ -79,32 +80,38 @@ const tableColumns = computed<DataColumn[]>(() => [
   ...visibleColumns.value,
   { key: 'actions', label: '', visible: true },
 ])
-const hasActiveFilters = computed(() => Boolean(
-  search.value
-  || status.value
-  || createdFrom.value
-  || createdTo.value
-  || isPublic.value
-  || showOnlineStatus.value
-  || showLastSeenAt.value
-  || deleted.value !== 'without',
-))
-const sortedUsers = computed<UserListItem[]>(() => [...users.value].sort((left, right) => {
-  if (sort.value === 'created_at') {
-    return timestamp(right.created_at) - timestamp(left.created_at)
-  }
+const hasActiveFilters = computed(() =>
+  Boolean(
+    search.value ||
+    status.value ||
+    createdFrom.value ||
+    createdTo.value ||
+    isPublic.value ||
+    showOnlineStatus.value ||
+    showLastSeenAt.value ||
+    deleted.value !== 'without',
+  ),
+)
+const sortedUsers = computed<UserListItem[]>(() =>
+  [...users.value].sort((left, right) => {
+    if (sort.value === 'created_at') {
+      return timestamp(right.created_at) - timestamp(left.created_at)
+    }
 
-  const direction = sort.value === 'username_desc' ? -1 : 1
+    const direction = sort.value === 'username_desc' ? -1 : 1
 
-  return direction * left.username.localeCompare(right.username, 'ru', { sensitivity: 'base' })
-}))
-const rows = computed<Record<string, unknown>[]>(() => sortedUsers.value.map((user) => ({
-  ...user,
-  avatar: user.avatar_url,
-  birthday: formatDate(user.birthday, false),
-  last_seen_at: formatDate(user.last_seen_at),
-  created_at: formatDate(user.created_at),
-})))
+    return direction * left.username.localeCompare(right.username, 'ru', { sensitivity: 'base' })
+  }),
+)
+const rows = computed<Record<string, unknown>[]>(() =>
+  sortedUsers.value.map((user) => ({
+    ...user,
+    avatar: user.avatar_url,
+    birthday: formatDate(user.birthday, false),
+    last_seen_at: formatDate(user.last_seen_at),
+    created_at: formatDate(user.created_at),
+  })),
+)
 const subtitle = computed(() => {
   if (hasActiveFilters.value && filteredTotal.value !== total.value) {
     return `Всего пользователей: ${total.value}. Найдено: ${filteredTotal.value}.`
@@ -145,9 +152,9 @@ function statusColorClass(row: Record<string, unknown>): string {
 }
 
 function toggleColumn(key: string): void {
-  columns.value = columns.value.map((column) => (
-    column.key === key ? { ...column, visible: !column.visible } : column
-  ))
+  columns.value = columns.value.map((column) =>
+    column.key === key ? { ...column, visible: !column.visible } : column,
+  )
 }
 
 function resetFilters(): void {
@@ -217,11 +224,7 @@ function block(row: Record<string, unknown>): void {
 function unblock(row: Record<string, unknown>): void {
   const userId = Number(row.id)
 
-  void runUserAction(
-    userId,
-    () => unblockUser(userId),
-    'Пользователь разблокирован.',
-  )
+  void runUserAction(userId, () => unblockUser(userId), 'Пользователь разблокирован.')
 }
 
 function freeze(row: Record<string, unknown>): void {
@@ -231,11 +234,7 @@ function freeze(row: Record<string, unknown>): void {
 function unfreeze(row: Record<string, unknown>): void {
   const userId = Number(row.id)
 
-  void runUserAction(
-    userId,
-    () => unfreezeUser(userId),
-    'Пользователь разморожен.',
-  )
+  void runUserAction(userId, () => unfreezeUser(userId), 'Пользователь разморожен.')
 }
 
 function softDelete(row: Record<string, unknown>): void {
@@ -277,15 +276,18 @@ function deleteUserName(row: Record<string, unknown> | null): string {
   return displayName || username || 'пользователь'
 }
 
-const deleteModalDescription = computed(() => (
-  `Пользователь ${deleteUserName(pendingDeleteUser.value)} будет удален. Это действие скроет его из рабочего списка.`
-))
-const blockModalDescription = computed(() => (
-  `Пользователь ${deleteUserName(pendingBlockUser.value)} будет заблокирован и потеряет доступ к активным возможностям аккаунта.`
-))
-const freezeModalDescription = computed(() => (
-  `Пользователь ${deleteUserName(pendingFreezeUser.value)} будет заморожен и потеряет доступ к активным возможностям аккаунта.`
-))
+const deleteModalDescription = computed(
+  () =>
+    `Пользователь ${deleteUserName(pendingDeleteUser.value)} будет удален. Это действие скроет его из рабочего списка.`,
+)
+const blockModalDescription = computed(
+  () =>
+    `Пользователь ${deleteUserName(pendingBlockUser.value)} будет заблокирован и потеряет доступ к активным возможностям аккаунта.`,
+)
+const freezeModalDescription = computed(
+  () =>
+    `Пользователь ${deleteUserName(pendingFreezeUser.value)} будет заморожен и потеряет доступ к активным возможностям аккаунта.`,
+)
 
 function confirmBlock(): void {
   if (!pendingBlockUser.value) {
@@ -295,11 +297,7 @@ function confirmBlock(): void {
   const row = pendingBlockUser.value
   const userId = Number(row.id)
 
-  void runUserAction(
-    userId,
-    () => blockUser(userId),
-    'Пользователь заблокирован.',
-  )
+  void runUserAction(userId, () => blockUser(userId), 'Пользователь заблокирован.')
 
   pendingBlockUser.value = null
 }
@@ -312,11 +310,7 @@ function confirmFreeze(): void {
   const row = pendingFreezeUser.value
   const userId = Number(row.id)
 
-  void runUserAction(
-    userId,
-    () => freezeUser(userId),
-    'Пользователь заморожен.',
-  )
+  void runUserAction(userId, () => freezeUser(userId), 'Пользователь заморожен.')
 
   pendingFreezeUser.value = null
 }
@@ -329,18 +323,17 @@ function confirmSoftDelete(): void {
   const row = pendingDeleteUser.value
   const userId = Number(row.id)
 
-  void runUserAction(
-    userId,
-    () => softDeleteUser(userId),
-    'Пользователь удален.',
-  )
+  void runUserAction(userId, () => softDeleteUser(userId), 'Пользователь удален.')
 
   pendingDeleteUser.value = null
 }
 
-watch([search, status, createdFrom, createdTo, isPublic, showOnlineStatus, showLastSeenAt, deleted], () => {
-  void loadUsers()
-})
+watch(
+  [search, status, createdFrom, createdTo, isPublic, showOnlineStatus, showLastSeenAt, deleted],
+  () => {
+    void loadUsers()
+  },
+)
 
 onMounted(() => {
   void loadUsers()
@@ -359,15 +352,7 @@ onMounted(() => {
 
       <section class="game-filters" aria-label="Фильтры пользователей">
         <div class="game-filter-top game-filter-top--with-actions">
-          <label class="game-filter-search">
-            <Search class="game-filter-search__icon" :size="18" :stroke-width="1.9" aria-hidden="true" />
-            <input
-              v-model="search"
-              class="game-filter-search__input"
-              type="search"
-              placeholder="Поиск"
-            >
-          </label>
+          <SearchField v-model="search" />
 
           <button
             class="game-filter-advanced"
@@ -388,13 +373,17 @@ onMounted(() => {
             </summary>
 
             <div class="data-toolbar__columns-menu">
-              <label v-for="column in columns" :key="column.key" class="data-toolbar__column-option">
+              <label
+                v-for="column in columns"
+                :key="column.key"
+                class="data-toolbar__column-option"
+              >
                 <input
                   class="checkbox-control"
                   type="checkbox"
                   :checked="column.visible"
                   @change="toggleColumn(column.key)"
-                >
+                />
                 <span>{{ column.label }}</span>
               </label>
             </div>
@@ -429,7 +418,7 @@ onMounted(() => {
                 type="date"
                 :max="createdTo || undefined"
                 aria-label="Создан от"
-              >
+              />
               <span class="game-filter-date-range__separator">-</span>
               <input
                 v-model="createdTo"
@@ -437,7 +426,7 @@ onMounted(() => {
                 type="date"
                 :min="createdFrom || undefined"
                 aria-label="Создан до"
-              >
+              />
             </span>
           </label>
 
@@ -472,7 +461,10 @@ onMounted(() => {
         </div>
       </section>
 
-      <div class="game-results-layout" :class="{ 'game-results-layout--with-panel': advancedFiltersOpen }">
+      <div
+        class="game-results-layout"
+        :class="{ 'game-results-layout--with-panel': advancedFiltersOpen }"
+      >
         <div class="data-table-panel">
           <DataTable
             :columns="tableColumns"
@@ -481,95 +473,90 @@ onMounted(() => {
             :page-size="pageSize"
             empty-text="Пользователи не найдены"
           >
-          <template #cell-avatar="{ row }">
-            <span class="user-avatar" aria-hidden="true">
-              <img
-                v-if="row.avatar"
-                :src="String(row.avatar)"
-                alt=""
-              >
-              <span v-else>{{ avatarLabel(row) }}</span>
-            </span>
-          </template>
+            <template #cell-avatar="{ row }">
+              <span class="user-avatar" aria-hidden="true">
+                <img v-if="row.avatar" :src="String(row.avatar)" alt="" />
+                <span v-else>{{ avatarLabel(row) }}</span>
+              </span>
+            </template>
 
-          <template #cell-actions="{ row }">
-            <div class="user-actions">
-              <RouterLink
-                class="data-table__icon-action"
-                :to="{ name: 'user.show', params: { id: String(row.id) } }"
-                aria-label="Открыть пользователя"
-                title="Открыть пользователя"
-              >
-                <Eye :size="17" :stroke-width="1.9" aria-hidden="true" />
-              </RouterLink>
+            <template #cell-actions="{ row }">
+              <div class="user-actions">
+                <RouterLink
+                  class="data-table__icon-action"
+                  :to="{ name: 'user.show', params: { id: String(row.id) } }"
+                  aria-label="Открыть пользователя"
+                  title="Открыть пользователя"
+                >
+                  <Eye :size="17" :stroke-width="1.9" aria-hidden="true" />
+                </RouterLink>
 
-              <button
-                v-if="row.status === 'blocked'"
-                class="data-table__icon-action"
-                type="button"
-                :disabled="actionUserId === Number(row.id)"
-                aria-label="Разблокировать пользователя"
-                title="Разблокировать пользователя"
-                @click="unblock(row)"
-              >
-                <RotateCcw :size="17" :stroke-width="1.9" aria-hidden="true" />
-              </button>
+                <button
+                  v-if="row.status === 'blocked'"
+                  class="data-table__icon-action"
+                  type="button"
+                  :disabled="actionUserId === Number(row.id)"
+                  aria-label="Разблокировать пользователя"
+                  title="Разблокировать пользователя"
+                  @click="unblock(row)"
+                >
+                  <RotateCcw :size="17" :stroke-width="1.9" aria-hidden="true" />
+                </button>
 
-              <button
-                v-if="row.status !== 'blocked'"
-                class="data-table__icon-action"
-                type="button"
-                :disabled="actionUserId === Number(row.id)"
-                aria-label="Заблокировать пользователя"
-                title="Заблокировать пользователя"
-                @click="block(row)"
-              >
-                <Ban :size="17" :stroke-width="1.9" aria-hidden="true" />
-              </button>
+                <button
+                  v-if="row.status !== 'blocked'"
+                  class="data-table__icon-action"
+                  type="button"
+                  :disabled="actionUserId === Number(row.id)"
+                  aria-label="Заблокировать пользователя"
+                  title="Заблокировать пользователя"
+                  @click="block(row)"
+                >
+                  <Ban :size="17" :stroke-width="1.9" aria-hidden="true" />
+                </button>
 
-              <button
-                v-if="row.status === 'active'"
-                class="data-table__icon-action"
-                type="button"
-                :disabled="actionUserId === Number(row.id)"
-                aria-label="Заморозить пользователя"
-                title="Заморозить пользователя"
-                @click="freeze(row)"
-              >
-                <Snowflake :size="17" :stroke-width="1.9" aria-hidden="true" />
-              </button>
+                <button
+                  v-if="row.status === 'active'"
+                  class="data-table__icon-action"
+                  type="button"
+                  :disabled="actionUserId === Number(row.id)"
+                  aria-label="Заморозить пользователя"
+                  title="Заморозить пользователя"
+                  @click="freeze(row)"
+                >
+                  <Snowflake :size="17" :stroke-width="1.9" aria-hidden="true" />
+                </button>
 
-              <button
-                v-if="row.status === 'suspended'"
-                class="data-table__icon-action"
-                type="button"
-                :disabled="actionUserId === Number(row.id)"
-                aria-label="Разморозить пользователя"
-                title="Разморозить пользователя"
-                @click="unfreeze(row)"
-              >
-                <RotateCcw :size="17" :stroke-width="1.9" aria-hidden="true" />
-              </button>
+                <button
+                  v-if="row.status === 'suspended'"
+                  class="data-table__icon-action"
+                  type="button"
+                  :disabled="actionUserId === Number(row.id)"
+                  aria-label="Разморозить пользователя"
+                  title="Разморозить пользователя"
+                  @click="unfreeze(row)"
+                >
+                  <RotateCcw :size="17" :stroke-width="1.9" aria-hidden="true" />
+                </button>
 
-              <button
-                class="data-table__icon-action data-table__icon-action--danger"
-                type="button"
-                :disabled="actionUserId === Number(row.id)"
-                aria-label="Мягко удалить пользователя"
-                title="Мягко удалить пользователя"
-                @click="softDelete(row)"
-              >
-                <Trash2 :size="17" :stroke-width="1.9" aria-hidden="true" />
-              </button>
-            </div>
-          </template>
+                <button
+                  class="data-table__icon-action data-table__icon-action--danger"
+                  type="button"
+                  :disabled="actionUserId === Number(row.id)"
+                  aria-label="Мягко удалить пользователя"
+                  title="Мягко удалить пользователя"
+                  @click="softDelete(row)"
+                >
+                  <Trash2 :size="17" :stroke-width="1.9" aria-hidden="true" />
+                </button>
+              </div>
+            </template>
 
-          <template #cell-status_label="{ row, value }">
-            <span class="status-badge" :class="statusColorClass(row)">
-              {{ value }}
-            </span>
-          </template>
-
+            <template #cell-status_label="{ row, value }">
+              <span class="status-badge" :class="statusColorClass(row)">
+                {{ value }}
+              </span>
+            </template>
           </DataTable>
         </div>
 

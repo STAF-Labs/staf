@@ -180,6 +180,10 @@
   grid-template-columns: minmax(140px, 200px) minmax(160px, 220px) minmax(260px, 360px) minmax(170px, 240px) minmax(190px, 260px) minmax(0, 1fr) auto;
 }
 
+.game-filter-row--orgs {
+  grid-template-columns: minmax(140px, 200px) minmax(150px, 210px) minmax(150px, 220px) minmax(260px, 360px) minmax(0, 1fr) auto;
+}
+
 .game-filter-field {
   display: grid;
   gap: 7px;
@@ -619,6 +623,7 @@
   .game-filter-row--projects,
   .game-filter-row--content-types,
   .game-filter-row--users,
+  .game-filter-row--orgs,
   .game-results-layout--with-panel {
     grid-template-columns: 1fr;
   }

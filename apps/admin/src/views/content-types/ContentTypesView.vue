@@ -1,13 +1,25 @@
 <script setup lang="ts">
-import { BookKey, Columns3, FileSpreadsheet, Pencil, Plus, RotateCcw, Search, SlidersHorizontal, Trash2 } from '@lucide/vue'
+import {
+  BookKey,
+  Columns3,
+  FileSpreadsheet,
+  Pencil,
+  Plus,
+  RotateCcw,
+  SlidersHorizontal,
+  Trash2,
+} from '@lucide/vue'
 import { AxiosError } from 'axios'
 import { computed, onMounted, ref } from 'vue'
 import ContentTypeModal from '@/components/content-types/ContentTypeModal.vue'
 import DataTable from '@/components/data/DataTable.vue'
 import AppShell from '@/components/layout/AppShell.vue'
+import DeleteModal from '@/components/ui/DeleteModal.vue'
+import SearchField from '@/components/ui/SearchField.vue'
 import type { DataColumn } from '@/shared/data/table'
 import {
   createContentType as createContentTypeRequest,
+  deleteContentType as deleteContentTypeRequest,
   fetchContentTypes,
   toggleContentTypePublic,
   updateContentType,
@@ -19,12 +31,12 @@ import { fetchGames, type GameListItem } from '@/shared/games/games'
 type PublicFilter = 'all' | 'public' | 'private'
 type SortOption = 'name_asc' | 'name_desc' | 'created_at'
 
-const publicFilterOptions: Array<{ value: PublicFilter, label: string }> = [
+const publicFilterOptions: Array<{ value: PublicFilter; label: string }> = [
   { value: 'all', label: 'Все' },
   { value: 'public', label: 'Да' },
   { value: 'private', label: 'Нет' },
 ]
-const sortOptions: Array<{ value: SortOption, label: string }> = [
+const sortOptions: Array<{ value: SortOption; label: string }> = [
   { value: 'name_asc', label: 'А-Я' },
   { value: 'name_desc', label: 'Я-А' },
   { value: 'created_at', label: 'Дата создания' },
@@ -48,6 +60,7 @@ const createError = ref('')
 const message = ref('')
 const isLoading = ref(false)
 const actionContentTypeId = ref<number | null>(null)
+const pendingDeleteContentType = ref<ContentTypeListItem | null>(null)
 
 const columns = ref<DataColumn[]>([
   { key: 'id', label: 'ID', visible: false },
@@ -68,44 +81,60 @@ const gameFilterOptions = computed(() => {
     { value: 'all', label: 'Все игры' },
     ...games.value
       .map((game) => ({ value: String(game.id), label: game.name }))
-      .sort((firstOption, secondOption) => firstOption.label.localeCompare(secondOption.label, 'ru-RU')),
+      .sort((firstOption, secondOption) =>
+        firstOption.label.localeCompare(secondOption.label, 'ru-RU'),
+      ),
   ]
 })
-const hasActiveFilters = computed(() => Boolean(
-  search.value.trim()
-  || gameFilter.value !== 'all'
-  || createdFrom.value
-  || createdTo.value
-  || publicFilter.value !== 'all',
-))
-const filteredContentTypes = computed(() => contentTypes.value.filter((contentType) => (
-  matchesSearch(contentType)
-  && matchesGameFilter(contentType)
-  && matchesCreatedDateFilter(contentType)
-  && matchesPublicFilter(contentType)
-)))
-const sortedContentTypes = computed(() => [...filteredContentTypes.value].sort((firstContentType, secondContentType) => {
-  if (sort.value === 'name_desc') {
-    return (secondContentType.name ?? '').localeCompare(firstContentType.name ?? '', 'ru-RU')
-  }
+const hasActiveFilters = computed(() =>
+  Boolean(
+    search.value.trim() ||
+    gameFilter.value !== 'all' ||
+    createdFrom.value ||
+    createdTo.value ||
+    publicFilter.value !== 'all',
+  ),
+)
+const filteredContentTypes = computed(() =>
+  contentTypes.value.filter(
+    (contentType) =>
+      matchesSearch(contentType) &&
+      matchesGameFilter(contentType) &&
+      matchesCreatedDateFilter(contentType) &&
+      matchesPublicFilter(contentType),
+  ),
+)
+const sortedContentTypes = computed(() =>
+  [...filteredContentTypes.value].sort((firstContentType, secondContentType) => {
+    if (sort.value === 'name_desc') {
+      return (secondContentType.name ?? '').localeCompare(firstContentType.name ?? '', 'ru-RU')
+    }
 
-  if (sort.value === 'created_at') {
-    return createdTimestamp(secondContentType) - createdTimestamp(firstContentType)
-  }
+    if (sort.value === 'created_at') {
+      return createdTimestamp(secondContentType) - createdTimestamp(firstContentType)
+    }
 
-  return (firstContentType.name ?? '').localeCompare(secondContentType.name ?? '', 'ru-RU')
-}))
-const rows = computed<Record<string, unknown>[]>(() => sortedContentTypes.value.map((contentType) => ({
-  ...contentType,
-  game_name: contentType.game_names.length > 0 ? contentType.game_names.join(', ') : '—',
-  created_at: formatDate(contentType.created_at),
-})))
+    return (firstContentType.name ?? '').localeCompare(secondContentType.name ?? '', 'ru-RU')
+  }),
+)
+const rows = computed<Record<string, unknown>[]>(() =>
+  sortedContentTypes.value.map((contentType) => ({
+    ...contentType,
+    game_name: contentType.game_names.length > 0 ? contentType.game_names.join(', ') : '—',
+    created_at: formatDate(contentType.created_at),
+  })),
+)
 const subtitle = computed(() => {
   if (hasActiveFilters.value && filteredContentTypes.value.length !== contentTypes.value.length) {
     return `Всего типов контента: ${contentTypes.value.length}. Найдено: ${filteredContentTypes.value.length}.`
   }
 
   return `Всего типов контента: ${contentTypes.value.length}.`
+})
+const deleteModalDescription = computed(() => {
+  const name = pendingDeleteContentType.value?.name ?? 'тип контента'
+
+  return `Тип контента ${name} будет удален. Связи с играми также будут удалены.`
 })
 
 function matchesSearch(contentType: ContentTypeListItem): boolean {
@@ -156,9 +185,11 @@ function matchesCreatedDateFilter(contentType: ContentTypeListItem): boolean {
 }
 
 function matchesPublicFilter(contentType: ContentTypeListItem): boolean {
-  return publicFilter.value === 'all'
-    || (publicFilter.value === 'public' && contentType.is_public)
-    || (publicFilter.value === 'private' && !contentType.is_public)
+  return (
+    publicFilter.value === 'all' ||
+    (publicFilter.value === 'public' && contentType.is_public) ||
+    (publicFilter.value === 'private' && !contentType.is_public)
+  )
 }
 
 function createdTimestamp(contentType: ContentTypeListItem): number {
@@ -184,9 +215,9 @@ function formatDate(value: string | null): string {
 }
 
 function toggleColumn(key: string): void {
-  columns.value = columns.value.map((column) => (
-    column.key === key ? { ...column, visible: !column.visible } : column
-  ))
+  columns.value = columns.value.map((column) =>
+    column.key === key ? { ...column, visible: !column.visible } : column,
+  )
 }
 
 function resetFilters(): void {
@@ -238,10 +269,12 @@ async function togglePublic(row: Record<string, unknown>): Promise<void> {
   try {
     const updatedContentType = await toggleContentTypePublic(contentTypeId)
 
-    contentTypes.value = contentTypes.value.map((contentType) => (
-      contentType.id === updatedContentType.id ? updatedContentType : contentType
-    ))
-    message.value = updatedContentType.is_public ? 'Тип контента опубликован.' : 'Тип контента скрыт.'
+    contentTypes.value = contentTypes.value.map((contentType) =>
+      contentType.id === updatedContentType.id ? updatedContentType : contentType,
+    )
+    message.value = updatedContentType.is_public
+      ? 'Тип контента опубликован.'
+      : 'Тип контента скрыт.'
   } catch {
     message.value = 'Не удалось переключить публичность типа контента.'
   } finally {
@@ -249,8 +282,44 @@ async function togglePublic(row: Record<string, unknown>): Promise<void> {
   }
 }
 
-function deleteContentType(row: Record<string, unknown>): void {
-  message.value = `Удаление "${String(row.name)}" пока не подключено.`
+function openDeleteModal(row: Record<string, unknown>): void {
+  const contentType = contentTypes.value.find((item) => item.id === Number(row.id))
+
+  if (!contentType) {
+    return
+  }
+
+  pendingDeleteContentType.value = contentType
+}
+
+function closeDeleteModal(): void {
+  if (actionContentTypeId.value !== null) {
+    return
+  }
+
+  pendingDeleteContentType.value = null
+}
+
+async function confirmDelete(): Promise<void> {
+  if (!pendingDeleteContentType.value) {
+    return
+  }
+
+  const contentTypeId = pendingDeleteContentType.value.id
+
+  actionContentTypeId.value = contentTypeId
+  message.value = ''
+
+  try {
+    await deleteContentTypeRequest(contentTypeId)
+    await loadContentTypes()
+    message.value = 'Тип контента удален.'
+  } catch (error) {
+    message.value = apiErrorMessage(error, 'Не удалось удалить тип контента.')
+  } finally {
+    actionContentTypeId.value = null
+    pendingDeleteContentType.value = null
+  }
 }
 
 async function createContentType(payload: CreateContentTypePayload): Promise<void> {
@@ -262,9 +331,9 @@ async function createContentType(payload: CreateContentTypePayload): Promise<voi
     if (editingContentType.value) {
       const updatedContentType = await updateContentType(editingContentType.value.id, payload)
 
-      contentTypes.value = contentTypes.value.map((contentType) => (
-        contentType.id === updatedContentType.id ? updatedContentType : contentType
-      ))
+      contentTypes.value = contentTypes.value.map((contentType) =>
+        contentType.id === updatedContentType.id ? updatedContentType : contentType,
+      )
       message.value = 'Тип контента обновлен.'
     } else {
       await createContentTypeRequest(payload)
@@ -284,14 +353,27 @@ async function createContentType(payload: CreateContentTypePayload): Promise<voi
 function validationMessage(error: unknown): string {
   if (error instanceof AxiosError && error.response?.status === 422) {
     const errors = error.response.data?.errors
-    const firstError = errors && typeof errors === 'object'
-      ? Object.values(errors).flat().find((value) => typeof value === 'string')
-      : null
+    const firstError =
+      errors && typeof errors === 'object'
+        ? Object.values(errors)
+            .flat()
+            .find((value) => typeof value === 'string')
+        : null
 
     return typeof firstError === 'string' ? firstError : 'Проверьте поля формы.'
   }
 
-  return editingContentType.value ? 'Не удалось обновить тип контента.' : 'Не удалось создать тип контента.'
+  return editingContentType.value
+    ? 'Не удалось обновить тип контента.'
+    : 'Не удалось создать тип контента.'
+}
+
+function apiErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof AxiosError && typeof error.response?.data?.message === 'string') {
+    return error.response.data.message
+  }
+
+  return fallback
 }
 
 async function loadContentTypes(): Promise<void> {
@@ -351,15 +433,7 @@ onMounted(() => {
 
       <section class="game-filters" aria-label="Фильтры типов контента">
         <div class="game-filter-top game-filter-top--with-actions">
-          <label class="game-filter-search">
-            <Search class="game-filter-search__icon" :size="18" :stroke-width="1.9" aria-hidden="true" />
-            <input
-              v-model="search"
-              class="game-filter-search__input"
-              type="search"
-              placeholder="Поиск по названию"
-            >
-          </label>
+          <SearchField v-model="search" placeholder="Поиск по названию" />
 
           <button
             class="game-filter-advanced"
@@ -380,13 +454,17 @@ onMounted(() => {
             </summary>
 
             <div class="data-toolbar__columns-menu">
-              <label v-for="column in columns" :key="column.key" class="data-toolbar__column-option">
+              <label
+                v-for="column in columns"
+                :key="column.key"
+                class="data-toolbar__column-option"
+              >
                 <input
                   class="checkbox-control"
                   type="checkbox"
                   :checked="column.visible"
                   @change="toggleColumn(column.key)"
-                >
+                />
                 <span>{{ column.label }}</span>
               </label>
             </div>
@@ -412,7 +490,7 @@ onMounted(() => {
                 type="date"
                 :max="createdTo || undefined"
                 aria-label="Создан от"
-              >
+              />
               <span class="game-filter-date-range__separator">-</span>
               <input
                 v-model="createdTo"
@@ -420,14 +498,18 @@ onMounted(() => {
                 type="date"
                 :min="createdFrom || undefined"
                 aria-label="Создан до"
-              >
+              />
             </span>
           </label>
 
           <label class="game-filter-field">
             <span class="game-filter-field__label">Публичный</span>
             <select v-model="publicFilter" class="game-filter-field__control">
-              <option v-for="option in publicFilterOptions" :key="option.value" :value="option.value">
+              <option
+                v-for="option in publicFilterOptions"
+                :key="option.value"
+                :value="option.value"
+              >
                 {{ option.label }}
               </option>
             </select>
@@ -446,7 +528,10 @@ onMounted(() => {
         </div>
       </section>
 
-      <div class="game-results-layout" :class="{ 'game-results-layout--with-panel': advancedFiltersOpen }">
+      <div
+        class="game-results-layout"
+        :class="{ 'game-results-layout--with-panel': advancedFiltersOpen }"
+      >
         <div class="data-table-panel">
           <DataTable
             :columns="tableColumns"
@@ -456,7 +541,10 @@ onMounted(() => {
             empty-text="Типы контента не найдены"
           >
             <template #cell-is_public="{ value }">
-              <span class="status-badge" :class="value ? 'status-badge--success' : 'status-badge--gray'">
+              <span
+                class="status-badge"
+                :class="value ? 'status-badge--success' : 'status-badge--gray'"
+              >
                 {{ value ? 'Да' : 'Нет' }}
               </span>
             </template>
@@ -488,9 +576,10 @@ onMounted(() => {
                 <button
                   class="data-table__icon-action data-table__icon-action--danger"
                   type="button"
+                  :disabled="actionContentTypeId === Number(row.id)"
                   aria-label="Удалить тип контента"
                   title="Удалить"
-                  @click="deleteContentType(row)"
+                  @click="openDeleteModal(row)"
                 >
                   <Trash2 :size="17" :stroke-width="1.9" aria-hidden="true" />
                 </button>
@@ -535,6 +624,15 @@ onMounted(() => {
       :error="createError"
       @cancel="closeCreateModal"
       @submit="createContentType"
+    />
+
+    <DeleteModal
+      :open="pendingDeleteContentType !== null"
+      title="Удалить тип контента"
+      :description="deleteModalDescription"
+      :loading="actionContentTypeId !== null"
+      @cancel="closeDeleteModal"
+      @confirm="confirmDelete"
     />
   </AppShell>
 </template>

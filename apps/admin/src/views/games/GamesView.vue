@@ -1,20 +1,21 @@
 <script setup lang="ts">
-import { Eye, Pencil, Plus, RotateCcw, Search, SlidersHorizontal, Trash2 } from '@lucide/vue'
+import { Eye, Pencil, Plus, RotateCcw, SlidersHorizontal, Trash2 } from '@lucide/vue'
 import { computed, onMounted, ref } from 'vue'
 import AppShell from '@/components/layout/AppShell.vue'
 import DeleteModal from '@/components/ui/DeleteModal.vue'
+import SearchField from '@/components/ui/SearchField.vue'
 import { deleteGame, fetchGames, type GameListItem, type GameStatus } from '@/shared/games/games'
 
 type StatusFilter = GameStatus | 'all'
 type SortOption = 'name_asc' | 'name_desc' | 'released_at'
 
-const statusFilterOptions: Array<{ value: StatusFilter, label: string }> = [
+const statusFilterOptions: Array<{ value: StatusFilter; label: string }> = [
   { value: 'all', label: 'Все статусы' },
   { value: 'active', label: 'Активна' },
   { value: 'suspended', label: 'Приостановлена' },
   { value: 'blocked', label: 'Заблокирована' },
 ]
-const sortOptions: Array<{ value: SortOption, label: string }> = [
+const sortOptions: Array<{ value: SortOption; label: string }> = [
   { value: 'name_asc', label: 'А-Я' },
   { value: 'name_desc', label: 'Я-А' },
   { value: 'released_at', label: 'Дата релиза' },
@@ -34,28 +35,32 @@ const isLoading = ref(false)
 const actionGameId = ref<number | null>(null)
 const pendingDeleteGame = ref<GameListItem | null>(null)
 
-const hasActiveFilters = computed(() => Boolean(
-  search.value.trim()
-  || releaseDateFrom.value
-  || releaseDateTo.value
-  || statusFilter.value !== 'all',
-))
-const filteredGames = computed(() => games.value.filter((game) => (
-  matchesSearch(game)
-  && matchesReleaseDateFilter(game)
-  && matchesStatusFilter(game)
-)))
-const sortedGames = computed(() => [...filteredGames.value].sort((firstGame, secondGame) => {
-  if (sort.value === 'name_desc') {
-    return secondGame.name.localeCompare(firstGame.name, 'ru-RU')
-  }
+const hasActiveFilters = computed(() =>
+  Boolean(
+    search.value.trim() ||
+    releaseDateFrom.value ||
+    releaseDateTo.value ||
+    statusFilter.value !== 'all',
+  ),
+)
+const filteredGames = computed(() =>
+  games.value.filter(
+    (game) => matchesSearch(game) && matchesReleaseDateFilter(game) && matchesStatusFilter(game),
+  ),
+)
+const sortedGames = computed(() =>
+  [...filteredGames.value].sort((firstGame, secondGame) => {
+    if (sort.value === 'name_desc') {
+      return secondGame.name.localeCompare(firstGame.name, 'ru-RU')
+    }
 
-  if (sort.value === 'released_at') {
-    return releaseTimestamp(secondGame) - releaseTimestamp(firstGame)
-  }
+    if (sort.value === 'released_at') {
+      return releaseTimestamp(secondGame) - releaseTimestamp(firstGame)
+    }
 
-  return firstGame.name.localeCompare(secondGame.name, 'ru-RU')
-}))
+    return firstGame.name.localeCompare(secondGame.name, 'ru-RU')
+  }),
+)
 const visibleGames = computed(() => sortedGames.value.slice(0, pageSize.value))
 const subtitle = computed(() => {
   if (hasActiveFilters.value && filteredGames.value.length !== games.value.length) {
@@ -202,15 +207,7 @@ onMounted(() => {
 
       <section class="game-filters" aria-label="Фильтры игр">
         <div class="game-filter-top">
-          <label class="game-filter-search">
-            <Search class="game-filter-search__icon" :size="18" :stroke-width="1.9" aria-hidden="true" />
-            <input
-              v-model="search"
-              class="game-filter-search__input"
-              type="search"
-              placeholder="Поиск по названию"
-            >
-          </label>
+          <SearchField v-model="search" placeholder="Поиск по названию" />
 
           <button
             class="game-filter-advanced"
@@ -235,7 +232,7 @@ onMounted(() => {
                 type="date"
                 :max="releaseDateTo || undefined"
                 aria-label="Дата релиза от"
-              >
+              />
               <span class="game-filter-date-range__separator">-</span>
               <input
                 v-model="releaseDateTo"
@@ -243,14 +240,18 @@ onMounted(() => {
                 type="date"
                 :min="releaseDateFrom || undefined"
                 aria-label="Дата релиза до"
-              >
+              />
             </span>
           </label>
 
           <label class="game-filter-field">
             <span class="game-filter-field__label">Статус</span>
             <select v-model="statusFilter" class="game-filter-field__control">
-              <option v-for="option in statusFilterOptions" :key="option.value" :value="option.value">
+              <option
+                v-for="option in statusFilterOptions"
+                :key="option.value"
+                :value="option.value"
+              >
                 {{ option.label }}
               </option>
             </select>
@@ -269,21 +270,22 @@ onMounted(() => {
         </div>
       </section>
 
-      <div class="game-results-layout" :class="{ 'game-results-layout--with-panel': advancedFiltersOpen }">
+      <div
+        class="game-results-layout"
+        :class="{ 'game-results-layout--with-panel': advancedFiltersOpen }"
+      >
         <div class="game-card-grid" aria-label="Список игр">
-          <RouterLink class="game-card game-card--add" :to="{ name: 'games.create' }" aria-label="Добавить игру">
+          <RouterLink
+            class="game-card game-card--add"
+            :to="{ name: 'games.create' }"
+            aria-label="Добавить игру"
+          >
             <Plus class="game-card__add-icon" :size="58" :stroke-width="2.1" aria-hidden="true" />
           </RouterLink>
 
-          <div v-if="isLoading" class="game-card game-card--loading">
-            Загрузка...
-          </div>
+          <div v-if="isLoading" class="game-card game-card--loading">Загрузка...</div>
 
-          <article
-            v-for="game in visibleGames"
-            :key="game.id"
-            class="game-card"
-          >
+          <article v-for="game in visibleGames" :key="game.id" class="game-card">
             <RouterLink
               class="game-card__link"
               :to="{ name: 'games.edit', params: { id: String(game.id) } }"
@@ -295,8 +297,10 @@ onMounted(() => {
                   class="game-card__logo"
                   :src="game.logo_url"
                   :alt="game.name"
-                >
-                <span v-else class="game-card__placeholder">{{ game.name.slice(0, 1).toUpperCase() }}</span>
+                />
+                <span v-else class="game-card__placeholder">{{
+                  game.name.slice(0, 1).toUpperCase()
+                }}</span>
                 <span class="game-card__name">{{ game.name }}</span>
               </span>
             </RouterLink>

@@ -59,6 +59,21 @@ class ContentTypeController extends Controller
         );
     }
 
+    public function destroy(ContentType $contentType): JsonResponse
+    {
+        if ($contentType->gameContentTypes()->whereHas('projects')->exists()) {
+            return response()->json([
+                'message' => 'Нельзя удалить тип контента, который используется в проектах.',
+            ], 409);
+        }
+
+        $contentType->delete();
+
+        return response()->json([
+            'message' => 'Тип контента удален.',
+        ]);
+    }
+
     public function validateImport(
         ValidateContentTypeImportRequest $request,
         ContentTypeImportParser $parser

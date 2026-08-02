@@ -49,6 +49,12 @@ export async function toggleContentTypePublic(id: number | string): Promise<Cont
   return response.data
 }
 
+export async function deleteContentType(id: number | string): Promise<{ message: string }> {
+  const response = await http.delete<{ message: string }>(`/api/content-types/${id}`)
+
+  return response.data
+}
+
 export async function validateContentTypeImportFile(file: File): Promise<ContentTypeImportValidationResponse> {
   const formData = new FormData()
   formData.append('file', file)

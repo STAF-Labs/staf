@@ -38,6 +38,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/content-types', [ContentTypeController::class, 'store']);
     Route::patch('/content-types/{contentType}', [ContentTypeController::class, 'update']);
     Route::patch('/content-types/{contentType}/toggle-public', [ContentTypeController::class, 'togglePublic']);
+    Route::delete('/content-types/{contentType}', [ContentTypeController::class, 'destroy']);
     Route::post('/content-types/import/validate', [ContentTypeController::class, 'validateImport']);
     Route::post('/content-types/import', [ContentTypeController::class, 'import']);
     Route::get('/game-content-types', [ProjectController::class, 'contentTypes']);

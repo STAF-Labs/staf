@@ -3,6 +3,9 @@
 namespace Tests\Feature\Admin\ContentType;
 
 use App\Models\Game\ContentType\ContentType;
+use App\Models\Game\ContentType\GameContentType;
+use App\Models\Game\Game;
+use App\Models\Game\Project\Project;
 use App\Models\User\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -216,6 +219,67 @@ class ContentTypeImportValidationTest extends TestCase
             'id' => $contentType->id,
             'name' => 'Модификация',
             'is_public' => false,
+        ]);
+    }
+
+    public function test_admin_can_delete_content_type(): void
+    {
+        $user = User::query()->create([
+            'username' => 'admin',
+            'email' => 'admin@example.com',
+            'password' => 'password',
+        ]);
+        $contentType = ContentType::query()->create([
+            'name' => 'Мод',
+            'is_public' => true,
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->deleteJson("/api/content-types/{$contentType->id}")
+            ->assertOk()
+            ->assertJsonPath('message', 'Тип контента удален.');
+
+        $this->assertDatabaseMissing('content_types', [
+            'id' => $contentType->id,
+        ]);
+    }
+
+    public function test_admin_cannot_delete_content_type_used_by_project(): void
+    {
+        $user = User::query()->create([
+            'username' => 'admin',
+            'email' => 'admin@example.com',
+            'password' => 'password',
+        ]);
+        $game = Game::query()->create([
+            'name' => 'STAF',
+            'status' => 'active',
+        ]);
+        $contentType = ContentType::query()->create([
+            'name' => 'Мод',
+            'is_public' => true,
+        ]);
+        $gameContentType = GameContentType::query()->create([
+            'game_id' => $game->id,
+            'content_type_id' => $contentType->id,
+        ]);
+        Project::query()->create([
+            'ownerable_type' => User::class,
+            'ownerable_id' => $user->id,
+            'game_content_type_id' => $gameContentType->id,
+            'title' => 'Проект',
+            'description' => [],
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->deleteJson("/api/content-types/{$contentType->id}")
+            ->assertConflict()
+            ->assertJsonPath('message', 'Нельзя удалить тип контента, который используется в проектах.');
+
+        $this->assertDatabaseHas('content_types', [
+            'id' => $contentType->id,
         ]);
     }
 

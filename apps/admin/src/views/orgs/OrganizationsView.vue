@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { Ban, Eye, RotateCcw, Snowflake, Trash2 } from '@lucide/vue'
+import { Ban, Columns3, Eye, RotateCcw, SlidersHorizontal, Snowflake, Trash2 } from '@lucide/vue'
 import DataTable from '@/components/data/DataTable.vue'
-import DataToolbar from '@/components/data/DataToolbar.vue'
 import AppShell from '@/components/layout/AppShell.vue'
 import BlockModal from '@/components/ui/BlockModal.vue'
 import DeleteModal from '@/components/ui/DeleteModal.vue'
+import SearchField from '@/components/ui/SearchField.vue'
 import type { DataColumn } from '@/shared/data/table'
 import {
   blockOrganization,
@@ -24,6 +24,9 @@ const verification = ref('')
 const createdFrom = ref('')
 const createdTo = ref('')
 const deleted = ref('without')
+const pageSize = ref(20)
+const sort = ref<'name_asc' | 'name_desc' | 'created_at'>('name_asc')
+const advancedFiltersOpen = ref(false)
 const organizations = ref<OrganizationListItem[]>([])
 const total = ref(0)
 const filteredTotal = ref(0)
@@ -66,26 +69,47 @@ const deletedOptions = [
   { value: 'only', label: 'Удалённые' },
   { value: 'without', label: 'Активные' },
 ]
+const pageSizeOptions = [10, 20, 30, 40, 50]
+const sortOptions = [
+  { value: 'name_asc', label: 'А-Я' },
+  { value: 'name_desc', label: 'Я-А' },
+  { value: 'created_at', label: 'Дата создания' },
+]
 
 const visibleColumns = computed(() => columns.value.filter((column) => column.visible))
 const tableColumns = computed<DataColumn[]>(() => [
   ...visibleColumns.value,
   { key: 'actions', label: '', visible: true },
 ])
-const hasActiveFilters = computed(() => Boolean(
-  search.value
-  || status.value
-  || isVisible.value
-  || verification.value
-  || createdFrom.value
-  || createdTo.value
-  || deleted.value !== 'without',
-))
-const rows = computed<Record<string, unknown>[]>(() => organizations.value.map((organization) => ({
-  ...organization,
-  verified_at: formatDate(organization.verified_at),
-  created_at: formatDate(organization.created_at),
-})))
+const hasActiveFilters = computed(() =>
+  Boolean(
+    search.value ||
+    status.value ||
+    isVisible.value ||
+    verification.value ||
+    createdFrom.value ||
+    createdTo.value ||
+    deleted.value !== 'without',
+  ),
+)
+const sortedOrganizations = computed<OrganizationListItem[]>(() =>
+  [...organizations.value].sort((left, right) => {
+    if (sort.value === 'created_at') {
+      return timestamp(right.created_at) - timestamp(left.created_at)
+    }
+
+    const direction = sort.value === 'name_desc' ? -1 : 1
+
+    return direction * left.name.localeCompare(right.name, 'ru', { sensitivity: 'base' })
+  }),
+)
+const rows = computed<Record<string, unknown>[]>(() =>
+  sortedOrganizations.value.map((organization) => ({
+    ...organization,
+    verified_at: formatDate(organization.verified_at),
+    created_at: formatDate(organization.created_at),
+  })),
+)
 const subtitle = computed(() => {
   if (hasActiveFilters.value && filteredTotal.value !== total.value) {
     return `Всего организаций: ${total.value}. Найдено: ${filteredTotal.value}.`
@@ -93,6 +117,10 @@ const subtitle = computed(() => {
 
   return `Всего организаций: ${total.value}.`
 })
+
+function timestamp(value: string | null): number {
+  return value ? new Date(value).getTime() : 0
+}
 
 function formatDate(value: string | null): string {
   if (!value) {
@@ -114,26 +142,24 @@ function statusColorClass(row: Record<string, unknown>): string {
   return `status-badge--${color}`
 }
 
-function filterChoiceClass(currentValue: string, optionValue: string): Record<string, boolean> {
-  return {
-    'filter-choice': true,
-    'filter-choice--active': currentValue === optionValue,
-  }
-}
-
 function toggleColumn(key: string): void {
-  columns.value = columns.value.map((column) => (
-    column.key === key ? { ...column, visible: !column.visible } : column
-  ))
+  columns.value = columns.value.map((column) =>
+    column.key === key ? { ...column, visible: !column.visible } : column,
+  )
 }
 
 function resetFilters(): void {
+  search.value = ''
   status.value = ''
   isVisible.value = ''
   verification.value = ''
   createdFrom.value = ''
   createdTo.value = ''
   deleted.value = 'without'
+}
+
+function toggleAdvancedFilters(): void {
+  advancedFiltersOpen.value = !advancedFiltersOpen.value
 }
 
 async function loadOrganizations(): Promise<void> {
@@ -247,15 +273,18 @@ function organizationName(row: Record<string, unknown> | null): string {
   return name || slug || 'организация'
 }
 
-const deleteModalDescription = computed(() => (
-  `Организация ${organizationName(pendingDeleteOrganization.value)} будет удалена. Это действие скроет ее из рабочего списка.`
-))
-const blockModalDescription = computed(() => (
-  `Организация ${organizationName(pendingBlockOrganization.value)} будет заблокирована и потеряет доступ к активным возможностям.`
-))
-const freezeModalDescription = computed(() => (
-  `Организация ${organizationName(pendingFreezeOrganization.value)} будет заморожена и потеряет доступ к активным возможностям.`
-))
+const deleteModalDescription = computed(
+  () =>
+    `Организация ${organizationName(pendingDeleteOrganization.value)} будет удалена. Это действие скроет ее из рабочего списка.`,
+)
+const blockModalDescription = computed(
+  () =>
+    `Организация ${organizationName(pendingBlockOrganization.value)} будет заблокирована и потеряет доступ к активным возможностям.`,
+)
+const freezeModalDescription = computed(
+  () =>
+    `Организация ${organizationName(pendingFreezeOrganization.value)} будет заморожена и потеряет доступ к активным возможностям.`,
+)
 
 function confirmBlock(): void {
   if (!pendingBlockOrganization.value) {
@@ -325,204 +354,239 @@ onMounted(() => {
         <p class="data-page__subtitle">{{ subtitle }}</p>
       </header>
 
-      <div class="data-toolbar-panel">
-        <DataToolbar
-          v-model:search="search"
-          :columns="columns"
-          @toggle-column="toggleColumn"
-        >
-          <template #filters>
-            <div class="org-filters">
-              <div class="org-filters__choice-row">
-                <div class="filter-choice-group">
-                  <span class="filter-choice-group__label">Статус</span>
-                  <div class="filter-choice-group__options">
-                    <button
-                      v-for="option in statusOptions"
-                      :key="option.value"
-                      type="button"
-                      :class="filterChoiceClass(status, option.value)"
-                      @click="status = option.value"
-                    >
-                      {{ option.label }}
-                    </button>
-                  </div>
-                </div>
+      <p v-if="message" class="data-page__message">{{ message }}</p>
 
-                <div class="filter-choice-group">
-                  <span class="filter-choice-group__label">Видимость</span>
-                  <div class="filter-choice-group__options">
-                    <button
-                      v-for="option in booleanOptions"
-                      :key="option.value"
-                      type="button"
-                      :class="filterChoiceClass(isVisible, option.value)"
-                      @click="isVisible = option.value"
-                    >
-                      {{ option.label }}
-                    </button>
-                  </div>
-                </div>
+      <section class="game-filters" aria-label="Фильтры организаций">
+        <div class="game-filter-top game-filter-top--with-actions">
+          <SearchField v-model="search" />
 
-                <div class="filter-choice-group">
-                  <span class="filter-choice-group__label">Верификация</span>
-                  <div class="filter-choice-group__options">
-                    <button
-                      v-for="option in verificationOptions"
-                      :key="option.value"
-                      type="button"
-                      :class="filterChoiceClass(verification, option.value)"
-                      @click="verification = option.value"
-                    >
-                      {{ option.label }}
-                    </button>
-                  </div>
-                </div>
-              </div>
+          <button
+            class="game-filter-advanced"
+            :class="{ 'game-filter-advanced--active': advancedFiltersOpen }"
+            type="button"
+            title="Расширенные настройки"
+            :aria-pressed="advancedFiltersOpen"
+            @click="toggleAdvancedFilters"
+          >
+            <SlidersHorizontal :size="18" :stroke-width="1.9" aria-hidden="true" />
+            <span>Расширенные настройки</span>
+          </button>
 
-              <div class="org-filters__date-row">
-                <label class="filter-field">
-                  <span>Создана с</span>
-                  <input
-                    v-model="createdFrom"
-                    class="filter-field__control"
-                    type="date"
-                    :max="createdTo || undefined"
-                  >
-                </label>
+          <details class="data-toolbar__columns game-filter-columns">
+            <summary class="game-filter-advanced">
+              <Columns3 :size="18" :stroke-width="1.9" aria-hidden="true" />
+              <span>Колонки</span>
+            </summary>
 
-                <label class="filter-field">
-                  <span>Создана по</span>
-                  <input
-                    v-model="createdTo"
-                    class="filter-field__control"
-                    type="date"
-                    :min="createdFrom || undefined"
-                  >
-                </label>
-              </div>
+            <div class="data-toolbar__columns-menu">
+              <label
+                v-for="column in columns"
+                :key="column.key"
+                class="data-toolbar__column-option"
+              >
+                <input
+                  class="checkbox-control"
+                  type="checkbox"
+                  :checked="column.visible"
+                  @change="toggleColumn(column.key)"
+                />
+                <span>{{ column.label }}</span>
+              </label>
+            </div>
+          </details>
+        </div>
 
-              <div class="org-filters__deleted-row">
-                <div class="filter-choice-group filter-choice-group--compact">
-                  <span class="filter-choice-group__label">Удаление</span>
-                  <div class="filter-choice-group__options">
-                    <button
-                      v-for="option in deletedOptions"
-                      :key="option.value"
-                      type="button"
-                      :class="filterChoiceClass(deleted, option.value)"
-                      @click="deleted = option.value"
-                    >
-                      {{ option.label }}
-                    </button>
-                  </div>
-                </div>
-              </div>
+        <div class="game-filter-row game-filter-row--orgs">
+          <label class="game-filter-field">
+            <span class="game-filter-field__label">Статус</span>
+            <select v-model="status" class="game-filter-field__control">
+              <option v-for="option in statusOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
 
-              <div class="org-filters__footer">
-                <button
-                  class="data-toolbar__button filter-field__button"
-                  type="button"
-                  title="Сбросить фильтр"
-                  :disabled="!hasActiveFilters"
-                  @click="resetFilters"
+          <label class="game-filter-field">
+            <span class="game-filter-field__label">Видимость</span>
+            <select v-model="isVisible" class="game-filter-field__control">
+              <option v-for="option in booleanOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+
+          <label class="game-filter-field">
+            <span class="game-filter-field__label">Верификация</span>
+            <select v-model="verification" class="game-filter-field__control">
+              <option
+                v-for="option in verificationOptions"
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+
+          <label class="game-filter-field">
+            <span class="game-filter-field__label">Создана</span>
+            <span class="game-filter-date-range">
+              <input
+                v-model="createdFrom"
+                class="game-filter-date-range__input"
+                type="date"
+                :max="createdTo || undefined"
+                aria-label="Создана от"
+              />
+              <span class="game-filter-date-range__separator">-</span>
+              <input
+                v-model="createdTo"
+                class="game-filter-date-range__input"
+                type="date"
+                :min="createdFrom || undefined"
+                aria-label="Создана до"
+              />
+            </span>
+          </label>
+
+          <button
+            class="game-filter-reset"
+            type="button"
+            :disabled="!hasActiveFilters"
+            title="Сбросить фильтры"
+            @click="resetFilters"
+          >
+            <RotateCcw :size="18" :stroke-width="1.9" aria-hidden="true" />
+            <span>Сбросить</span>
+          </button>
+        </div>
+      </section>
+
+      <div
+        class="game-results-layout"
+        :class="{ 'game-results-layout--with-panel': advancedFiltersOpen }"
+      >
+        <div class="data-table-panel">
+          <DataTable
+            :columns="tableColumns"
+            :rows="rows"
+            :loading="isLoading"
+            :page-size="pageSize"
+            empty-text="Организации не найдены"
+          >
+            <template #cell-status_label="{ row, value }">
+              <span class="status-badge" :class="statusColorClass(row)">
+                {{ value }}
+              </span>
+            </template>
+
+            <template #cell-actions="{ row }">
+              <div class="org-actions">
+                <RouterLink
+                  class="data-table__icon-action"
+                  :to="{ name: 'org.show', params: { id: String(row.id) } }"
+                  aria-label="Открыть организацию"
+                  title="Открыть организацию"
                 >
-                  <Trash2 aria-hidden="true" style="color: var(--color-danger)" />
-                  <span>Сбросить фильтр</span>
+                  <Eye :size="17" :stroke-width="1.9" aria-hidden="true" />
+                </RouterLink>
+
+                <button
+                  v-if="row.status === 'blocked'"
+                  class="data-table__icon-action"
+                  type="button"
+                  :disabled="actionOrganizationId === Number(row.id)"
+                  aria-label="Разблокировать организацию"
+                  title="Разблокировать организацию"
+                  @click="unblock(row)"
+                >
+                  <RotateCcw :size="17" :stroke-width="1.9" aria-hidden="true" />
+                </button>
+
+                <button
+                  v-if="row.status !== 'blocked'"
+                  class="data-table__icon-action"
+                  type="button"
+                  :disabled="actionOrganizationId === Number(row.id)"
+                  aria-label="Заблокировать организацию"
+                  title="Заблокировать организацию"
+                  @click="block(row)"
+                >
+                  <Ban :size="17" :stroke-width="1.9" aria-hidden="true" />
+                </button>
+
+                <button
+                  v-if="row.status === 'active'"
+                  class="data-table__icon-action"
+                  type="button"
+                  :disabled="actionOrganizationId === Number(row.id)"
+                  aria-label="Заморозить организацию"
+                  title="Заморозить организацию"
+                  @click="freeze(row)"
+                >
+                  <Snowflake :size="17" :stroke-width="1.9" aria-hidden="true" />
+                </button>
+
+                <button
+                  v-if="row.status === 'suspended'"
+                  class="data-table__icon-action"
+                  type="button"
+                  :disabled="actionOrganizationId === Number(row.id)"
+                  aria-label="Разморозить организацию"
+                  title="Разморозить организацию"
+                  @click="unfreeze(row)"
+                >
+                  <RotateCcw :size="17" :stroke-width="1.9" aria-hidden="true" />
+                </button>
+
+                <button
+                  class="data-table__icon-action data-table__icon-action--danger"
+                  type="button"
+                  :disabled="actionOrganizationId === Number(row.id)"
+                  aria-label="Мягко удалить организацию"
+                  title="Мягко удалить организацию"
+                  @click="softDelete(row)"
+                >
+                  <Trash2 :size="17" :stroke-width="1.9" aria-hidden="true" />
                 </button>
               </div>
-            </div>
-          </template>
-        </DataToolbar>
-      </div>
+            </template>
+          </DataTable>
+        </div>
 
-      <div class="data-table-panel">
-        <p v-if="message" class="data-page__message">{{ message }}</p>
-
-        <DataTable
-          :columns="tableColumns"
-          :rows="rows"
-          :loading="isLoading"
-          empty-text="Организации не найдены"
+        <aside
+          class="game-advanced-panel"
+          :class="{ 'game-advanced-panel--open': advancedFiltersOpen }"
+          :aria-hidden="!advancedFiltersOpen"
+          aria-label="Расширенные настройки"
         >
-          <template #cell-status_label="{ row, value }">
-            <span class="status-badge" :class="statusColorClass(row)">
-              {{ value }}
-            </span>
-          </template>
+          <label class="game-filter-field">
+            <span class="game-filter-field__label">Сортировка</span>
+            <select v-model="sort" class="game-filter-field__control">
+              <option v-for="option in sortOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
 
-          <template #cell-actions="{ row }">
-            <div class="org-actions">
-              <RouterLink
-                class="data-table__icon-action"
-                :to="{ name: 'org.show', params: { id: String(row.id) } }"
-                aria-label="Открыть организацию"
-                title="Открыть организацию"
-              >
-                <Eye :size="17" :stroke-width="1.9" aria-hidden="true" />
-              </RouterLink>
+          <label class="game-filter-field">
+            <span class="game-filter-field__label">Вид</span>
+            <select v-model="pageSize" class="game-filter-field__control">
+              <option v-for="option in pageSizeOptions" :key="option" :value="option">
+                {{ option }}
+              </option>
+            </select>
+          </label>
 
-              <button
-                v-if="row.status === 'blocked'"
-                class="data-table__icon-action"
-                type="button"
-                :disabled="actionOrganizationId === Number(row.id)"
-                aria-label="Разблокировать организацию"
-                title="Разблокировать организацию"
-                @click="unblock(row)"
-              >
-                <RotateCcw :size="17" :stroke-width="1.9" aria-hidden="true" />
-              </button>
-
-              <button
-                v-if="row.status !== 'blocked'"
-                class="data-table__icon-action"
-                type="button"
-                :disabled="actionOrganizationId === Number(row.id)"
-                aria-label="Заблокировать организацию"
-                title="Заблокировать организацию"
-                @click="block(row)"
-              >
-                <Ban :size="17" :stroke-width="1.9" aria-hidden="true" />
-              </button>
-
-              <button
-                v-if="row.status === 'active'"
-                class="data-table__icon-action"
-                type="button"
-                :disabled="actionOrganizationId === Number(row.id)"
-                aria-label="Заморозить организацию"
-                title="Заморозить организацию"
-                @click="freeze(row)"
-              >
-                <Snowflake :size="17" :stroke-width="1.9" aria-hidden="true" />
-              </button>
-
-              <button
-                v-if="row.status === 'suspended'"
-                class="data-table__icon-action"
-                type="button"
-                :disabled="actionOrganizationId === Number(row.id)"
-                aria-label="Разморозить организацию"
-                title="Разморозить организацию"
-                @click="unfreeze(row)"
-              >
-                <RotateCcw :size="17" :stroke-width="1.9" aria-hidden="true" />
-              </button>
-
-              <button
-                class="data-table__icon-action data-table__icon-action--danger"
-                type="button"
-                :disabled="actionOrganizationId === Number(row.id)"
-                aria-label="Мягко удалить организацию"
-                title="Мягко удалить организацию"
-                @click="softDelete(row)"
-              >
-                <Trash2 :size="17" :stroke-width="1.9" aria-hidden="true" />
-              </button>
-            </div>
-          </template>
-        </DataTable>
+          <label class="game-filter-field">
+            <span class="game-filter-field__label">Удаленные</span>
+            <select v-model="deleted" class="game-filter-field__control">
+              <option v-for="option in deletedOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+        </aside>
       </div>
     </section>
 
@@ -558,96 +622,6 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.org-filters {
-  display: grid;
-  gap: 14px;
-  width: 100%;
-}
-
-.org-filters__choice-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 320px));
-  gap: 10px;
-}
-
-.org-filters__date-row {
-  display: flex;
-  align-items: end;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.org-filters__deleted-row {
-  display: flex;
-}
-
-.org-filters__footer {
-  display: flex;
-  justify-content: flex-start;
-
-  padding-top: 12px;
-  border-top: 1px solid var(--color-border-soft);
-}
-
-.filter-choice-group {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-  padding: 10px;
-
-  background: var(--color-bg-soft);
-  border: 1px solid var(--color-border-soft);
-  border-radius: var(--radius-md);
-}
-
-.filter-choice-group__label {
-  color: var(--color-text-muted);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.filter-choice-group__options {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 6px;
-  max-width: 100%;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding-bottom: 2px;
-  scrollbar-width: thin;
-}
-
-.filter-choice-group--compact {
-  width: fit-content;
-  min-width: min(100%, 260px);
-}
-
-.filter-choice {
-  min-height: 28px;
-  padding: 0 10px;
-
-  color: var(--color-text-muted);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-soft);
-  border-radius: 999px;
-  cursor: pointer;
-  white-space: nowrap;
-
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.filter-choice:hover {
-  color: var(--color-text);
-  background: var(--color-surface-hover);
-}
-
-.filter-choice--active {
-  color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
-  border-color: color-mix(in srgb, var(--color-primary) 32%, transparent);
-}
-
 .org-actions {
   display: inline-flex;
   align-items: center;
@@ -684,24 +658,5 @@ onMounted(() => {
   color: var(--color-danger);
   background: color-mix(in srgb, var(--color-danger) 10%, transparent);
   border-color: color-mix(in srgb, var(--color-danger) 28%, transparent);
-}
-
-@media (max-width: 680px) {
-  .org-filters__choice-row {
-    grid-template-columns: 1fr;
-  }
-
-  .org-filters__date-row {
-    display: grid;
-    grid-template-columns: 1fr;
-  }
-
-  .org-filters__deleted-row,
-  .filter-choice-group--compact,
-  .org-filters__footer,
-  .filter-field,
-  .filter-field__button {
-    width: 100%;
-  }
 }
 </style>

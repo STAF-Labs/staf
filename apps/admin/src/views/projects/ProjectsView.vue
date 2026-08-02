@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { Plus, RotateCcw, Search, SlidersHorizontal } from '@lucide/vue'
+import { Plus, RotateCcw, SlidersHorizontal } from '@lucide/vue'
 import AppShell from '@/components/layout/AppShell.vue'
+import SearchField from '@/components/ui/SearchField.vue'
 import { fetchGames, type GameListItem } from '@/shared/games/games'
 import { fetchProjects, type ProjectListItem, type ProjectStatus } from '@/shared/projects/projects'
 
 type StatusFilter = ProjectStatus | 'all'
 type SortOption = 'title_asc' | 'title_desc' | 'released_at'
 
-const statusFilterOptions: Array<{ value: StatusFilter, label: string }> = [
+const statusFilterOptions: Array<{ value: StatusFilter; label: string }> = [
   { value: 'all', label: 'Все статусы' },
   { value: 'draft', label: 'Черновик' },
   { value: 'on_moderation', label: 'На модерации' },
@@ -16,7 +17,7 @@ const statusFilterOptions: Array<{ value: StatusFilter, label: string }> = [
   { value: 'rejected', label: 'Отклонён' },
   { value: 'archived', label: 'В архиве' },
 ]
-const sortOptions: Array<{ value: SortOption, label: string }> = [
+const sortOptions: Array<{ value: SortOption; label: string }> = [
   { value: 'title_asc', label: 'А-Я' },
   { value: 'title_desc', label: 'Я-А' },
   { value: 'released_at', label: 'Дата релиза' },
@@ -41,33 +42,42 @@ const gameFilterOptions = computed(() => {
     { value: 'all', label: 'Все игры' },
     ...games.value
       .map((game) => ({ value: String(game.id), label: game.name }))
-      .sort((firstOption, secondOption) => firstOption.label.localeCompare(secondOption.label, 'ru-RU')),
+      .sort((firstOption, secondOption) =>
+        firstOption.label.localeCompare(secondOption.label, 'ru-RU'),
+      ),
   ]
 })
-const hasActiveFilters = computed(() => Boolean(
-  search.value.trim()
-  || gameFilter.value !== 'all'
-  || releaseDateFrom.value
-  || releaseDateTo.value
-  || statusFilter.value !== 'all',
-))
-const filteredProjects = computed(() => projects.value.filter((project) => (
-  matchesSearch(project)
-  && matchesGameFilter(project)
-  && matchesReleaseDateFilter(project)
-  && matchesStatusFilter(project)
-)))
-const sortedProjects = computed(() => [...filteredProjects.value].sort((firstProject, secondProject) => {
-  if (sort.value === 'title_desc') {
-    return secondProject.title.localeCompare(firstProject.title, 'ru-RU')
-  }
+const hasActiveFilters = computed(() =>
+  Boolean(
+    search.value.trim() ||
+    gameFilter.value !== 'all' ||
+    releaseDateFrom.value ||
+    releaseDateTo.value ||
+    statusFilter.value !== 'all',
+  ),
+)
+const filteredProjects = computed(() =>
+  projects.value.filter(
+    (project) =>
+      matchesSearch(project) &&
+      matchesGameFilter(project) &&
+      matchesReleaseDateFilter(project) &&
+      matchesStatusFilter(project),
+  ),
+)
+const sortedProjects = computed(() =>
+  [...filteredProjects.value].sort((firstProject, secondProject) => {
+    if (sort.value === 'title_desc') {
+      return secondProject.title.localeCompare(firstProject.title, 'ru-RU')
+    }
 
-  if (sort.value === 'released_at') {
-    return releaseTimestamp(secondProject) - releaseTimestamp(firstProject)
-  }
+    if (sort.value === 'released_at') {
+      return releaseTimestamp(secondProject) - releaseTimestamp(firstProject)
+    }
 
-  return firstProject.title.localeCompare(secondProject.title, 'ru-RU')
-}))
+    return firstProject.title.localeCompare(secondProject.title, 'ru-RU')
+  }),
+)
 const visibleProjects = computed(() => sortedProjects.value.slice(0, pageSize.value))
 const subtitle = computed(() => {
   if (hasActiveFilters.value && filteredProjects.value.length !== projects.value.length) {
@@ -153,10 +163,7 @@ async function loadProjects(): Promise<void> {
   message.value = ''
 
   try {
-    const [projectsResponse, gamesResponse] = await Promise.all([
-      fetchProjects(),
-      fetchGames(),
-    ])
+    const [projectsResponse, gamesResponse] = await Promise.all([fetchProjects(), fetchGames()])
 
     projects.value = projectsResponse.data
     games.value = gamesResponse.data
@@ -184,15 +191,7 @@ onMounted(() => {
 
       <section class="game-filters" aria-label="Фильтры проектов">
         <div class="game-filter-top">
-          <label class="game-filter-search">
-            <Search class="game-filter-search__icon" :size="18" :stroke-width="1.9" aria-hidden="true" />
-            <input
-              v-model="search"
-              class="game-filter-search__input"
-              type="search"
-              placeholder="Поиск по названию"
-            >
-          </label>
+          <SearchField v-model="search" placeholder="Поиск по названию" />
 
           <button
             class="game-filter-advanced"
@@ -226,7 +225,7 @@ onMounted(() => {
                 type="date"
                 :max="releaseDateTo || undefined"
                 aria-label="Дата релиза от"
-              >
+              />
               <span class="game-filter-date-range__separator">-</span>
               <input
                 v-model="releaseDateTo"
@@ -234,14 +233,18 @@ onMounted(() => {
                 type="date"
                 :min="releaseDateFrom || undefined"
                 aria-label="Дата релиза до"
-              >
+              />
             </span>
           </label>
 
           <label class="game-filter-field">
             <span class="game-filter-field__label">Статус</span>
             <select v-model="statusFilter" class="game-filter-field__control">
-              <option v-for="option in statusFilterOptions" :key="option.value" :value="option.value">
+              <option
+                v-for="option in statusFilterOptions"
+                :key="option.value"
+                :value="option.value"
+              >
                 {{ option.label }}
               </option>
             </select>
@@ -260,28 +263,36 @@ onMounted(() => {
         </div>
       </section>
 
-      <div class="game-results-layout" :class="{ 'game-results-layout--with-panel': advancedFiltersOpen }">
+      <div
+        class="game-results-layout"
+        :class="{ 'game-results-layout--with-panel': advancedFiltersOpen }"
+      >
         <div class="project-card-grid" aria-label="Список проектов">
-          <RouterLink class="project-card project-card--add" :to="{ name: 'projects.create' }" aria-label="Добавить проект">
-            <Plus class="project-card__add-icon" :size="58" :stroke-width="2.1" aria-hidden="true" />
+          <RouterLink
+            class="project-card project-card--add"
+            :to="{ name: 'projects.create' }"
+            aria-label="Добавить проект"
+          >
+            <Plus
+              class="project-card__add-icon"
+              :size="58"
+              :stroke-width="2.1"
+              aria-hidden="true"
+            />
           </RouterLink>
 
-          <div v-if="isLoading" class="project-card project-card--loading">
-            Загрузка...
-          </div>
+          <div v-if="isLoading" class="project-card project-card--loading">Загрузка...</div>
 
-          <article
-            v-for="project in visibleProjects"
-            :key="project.id"
-            class="project-card"
-          >
+          <article v-for="project in visibleProjects" :key="project.id" class="project-card">
             <RouterLink
               class="project-card__link"
               :to="{ name: 'projects.edit', params: { id: String(project.id) } }"
               :aria-label="`Редактировать проект ${project.title}`"
             >
               <span class="project-card__media">
-                <span class="project-card__placeholder">{{ project.title.slice(0, 1).toUpperCase() }}</span>
+                <span class="project-card__placeholder">{{
+                  project.title.slice(0, 1).toUpperCase()
+                }}</span>
                 <span class="project-card__name">{{ project.title }}</span>
               </span>
             </RouterLink>
