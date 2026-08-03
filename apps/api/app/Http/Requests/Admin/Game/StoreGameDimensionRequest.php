@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin\Game;
 
+use App\Enums\Filter\DimensionAppliesTo;
 use App\Enums\Filter\DimSelectionMode;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -19,7 +20,9 @@ class StoreGameDimensionRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:64'],
             'selection_mode' => ['required', Rule::enum(DimSelectionMode::class)],
+            'applies_to' => ['sometimes', 'required', Rule::enum(DimensionAppliesTo::class)],
             'is_filterable' => ['required', 'boolean'],
+            'is_required' => ['sometimes', 'required', 'boolean'],
         ];
     }
 }

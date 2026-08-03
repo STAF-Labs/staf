@@ -6,13 +6,16 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Game\CopyGameDimensionsRequest;
 use App\Http\Requests\Admin\Game\StoreGameDimensionRequest;
 use App\Http\Requests\Admin\Game\UpdateGameDimensionRequest;
+use App\Http\Requests\Admin\Game\ValidateGameDimensionImportRequest;
 use App\Http\Resources\Game\Filter\DimensionResource;
 use App\Models\Game\ContentType\GameContentType;
 use App\Models\Game\Filter\Dimension;
 use App\Models\Game\Game;
+use App\Services\Admin\Game\GameDimensionImportParser;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class GameDimensionController extends Controller
 {
@@ -94,6 +97,7 @@ class GameDimensionController extends Controller
                         'name' => $sourceDimension->name,
                         'slug' => $sourceDimension->slug,
                         'selection_mode' => $sourceDimension->selection_mode->value,
+                        'applies_to' => $sourceDimension->applies_to->value,
                         'is_filterable' => $sourceDimension->is_filterable,
                         'is_required' => $sourceDimension->is_required,
                         'is_active' => $sourceDimension->is_active,
@@ -175,6 +179,128 @@ class GameDimensionController extends Controller
         ]);
     }
 
+    public function validateImport(
+        ValidateGameDimensionImportRequest $request,
+        Game $game,
+        GameContentType $gameContentType,
+        GameDimensionImportParser $parser
+    ): JsonResponse {
+        $this->ensureGameContentTypeBelongsToGame($game, $gameContentType);
+        $result = $parser->parse($request->file('file'));
+
+        if (! $result['valid']) {
+            throw ValidationException::withMessages([
+                'file' => [$result['message']],
+            ]);
+        }
+
+        return response()->json($result);
+    }
+
+    public function import(
+        ValidateGameDimensionImportRequest $request,
+        Game $game,
+        GameContentType $gameContentType,
+        GameDimensionImportParser $parser
+    ): JsonResponse {
+        $this->ensureGameContentTypeBelongsToGame($game, $gameContentType);
+        $result = $parser->parse($request->file('file'));
+
+        if (! $result['valid']) {
+            throw ValidationException::withMessages([
+                'file' => [$result['message']],
+            ]);
+        }
+
+        $summary = DB::transaction(function () use ($gameContentType, $result): array {
+            $createdFilters = 0;
+            $reusedFilters = 0;
+            $createdValues = 0;
+            $skippedValues = 0;
+            $dimensionsByKey = [];
+            $valuesByKey = [];
+            $createdValueKeys = [];
+
+            foreach ($result['filters'] as $filterRow) {
+                $dimension = $gameContentType->dimensions()
+                    ->get()
+                    ->first(
+                        fn ($item): bool => $this->normalizedName($item->name) ===
+                            $this->normalizedName($filterRow['name'])
+                    );
+
+                if ($dimension === null) {
+                    $dimension = $gameContentType->dimensions()->create([
+                        'name' => $filterRow['name'],
+                        'selection_mode' => $filterRow['selection_mode'],
+                        'applies_to' => $filterRow['applies_to'],
+                        'is_filterable' => $filterRow['is_filterable'],
+                        'is_required' => $filterRow['is_required'],
+                        'is_active' => $filterRow['is_active'],
+                        'sort_order' => $filterRow['row'] - 2,
+                    ]);
+                    $createdFilters++;
+                } else {
+                    $reusedFilters++;
+                }
+
+                $dimensionsByKey[$filterRow['filter_key']] = $dimension;
+            }
+
+            foreach ($result['values'] as $valueRow) {
+                $dimension = $dimensionsByKey[$valueRow['filter_key']];
+                $value = $dimension->values()
+                    ->get()
+                    ->first(
+                        fn ($item): bool => $this->normalizedName($item->name) ===
+                            $this->normalizedName($valueRow['name'])
+                    );
+                $compositeKey = $valueRow['filter_key'].':'.$valueRow['value_key'];
+
+                if ($value === null) {
+                    $value = $dimension->values()->create([
+                        'name' => $valueRow['name'],
+                        'sort_order' => $valueRow['sort_order'],
+                        'is_active' => $valueRow['is_active'],
+                    ]);
+                    $createdValueKeys[$compositeKey] = true;
+                    $createdValues++;
+                } else {
+                    $skippedValues++;
+                }
+
+                $valuesByKey[$compositeKey] = $value;
+            }
+
+            foreach ($result['values'] as $valueRow) {
+                $compositeKey = $valueRow['filter_key'].':'.$valueRow['value_key'];
+
+                if ($valueRow['parent_key'] === null || ! isset($createdValueKeys[$compositeKey])) {
+                    continue;
+                }
+
+                $parentKey = $valueRow['filter_key'].':'.$valueRow['parent_key'];
+                $valuesByKey[$compositeKey]->update([
+                    'parent_id' => $valuesByKey[$parentKey]->id,
+                ]);
+            }
+
+            return [
+                'created_filters' => $createdFilters,
+                'reused_filters' => $reusedFilters,
+                'created_values' => $createdValues,
+                'skipped_values' => $skippedValues,
+            ];
+        });
+
+        return response()->json([
+            'message' => 'Импорт фильтров завершён.',
+            'total_filters' => count($result['filters']),
+            'total_values' => count($result['values']),
+            ...$summary,
+        ]);
+    }
+
     public function update(
         UpdateGameDimensionRequest $request,
         Game $game,
@@ -182,7 +308,19 @@ class GameDimensionController extends Controller
         Dimension $dimension
     ): JsonResponse {
         $this->ensureDimensionBelongsToContext($game, $gameContentType, $dimension);
-        $dimension->update($request->validated());
+        $validated = $request->validated();
+
+        if (
+            isset($validated['applies_to']) &&
+            $validated['applies_to'] !== $dimension->applies_to->value &&
+            ($dimension->projectSelections()->exists() || $dimension->releaseSelections()->exists())
+        ) {
+            return response()->json([
+                'message' => 'Нельзя изменить уровень фильтра, пока его значения используются.',
+            ], 409);
+        }
+
+        $dimension->update($validated);
 
         return response()->json(
             DimensionResource::make(

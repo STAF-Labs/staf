@@ -21,6 +21,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AppShell from '@/components/layout/AppShell.vue'
 import SearchField from '@/components/ui/SearchField.vue'
+import StepIndicator from '@/components/ui/StepIndicator.vue'
 import { fetchContentTypes, type ContentTypeListItem } from '@/shared/content-types/content-types'
 import {
   attachGameContentType,
@@ -43,6 +44,7 @@ import {
 import '@/assets/styles/game-view.css'
 
 const route = useRoute()
+const copyFilterSteps = ['Тип контента', 'Фильтры'] as const
 const game = ref<GameDetail | null>(null)
 const contentTypes = ref<ContentTypeListItem[]>([])
 const gameContentTypes = ref<GameContentTypeListItem[]>([])
@@ -1038,6 +1040,20 @@ void loadGame()
                   </header>
 
                   <div class="game-content-types-panel__toolbar">
+                    <RouterLink
+                      class="game-filter-advanced game-content-types-panel__advanced"
+                      :to="{
+                        name: 'games.content-types.filters.import',
+                        params: {
+                          id: game.id,
+                          gameContentTypeId: activeFiltersGameContentType.id,
+                        },
+                      }"
+                      title="Расширенные настройки"
+                    >
+                      <SlidersHorizontal :size="16" :stroke-width="2" aria-hidden="true" />
+                      <span>Расширенные настройки</span>
+                    </RouterLink>
                     <button
                       class="game-content-types-panel__copy"
                       type="button"
@@ -1524,23 +1540,12 @@ void loadGame()
                 </button>
               </header>
 
-              <div class="game-filter-copy-modal__steps" aria-label="Шаги копирования">
-                <span
-                  class="game-filter-copy-modal__step"
-                  :class="{ 'game-filter-copy-modal__step--active': copyFiltersStep === 1 }"
-                >
-                  <span>1</span>
-                  Тип контента
-                </span>
-                <span class="game-filter-copy-modal__step-line" aria-hidden="true" />
-                <span
-                  class="game-filter-copy-modal__step"
-                  :class="{ 'game-filter-copy-modal__step--active': copyFiltersStep === 2 }"
-                >
-                  <span>2</span>
-                  Фильтры
-                </span>
-              </div>
+              <StepIndicator
+                :steps="copyFilterSteps"
+                :current-step="copyFiltersStep"
+                aria-label="Шаги копирования"
+                variant="embedded"
+              />
 
               <div class="game-filter-copy-modal__viewport">
                 <div

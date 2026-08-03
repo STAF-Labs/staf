@@ -30,6 +30,7 @@ export type GameDimension = {
   name: string
   slug: string
   selection_mode: 'single' | 'multiple'
+  applies_to: 'project' | 'release'
   is_filterable: boolean
   is_required: boolean
   is_active: boolean
@@ -40,6 +41,7 @@ export type GameDimension = {
 export type CreateGameDimensionPayload = {
   name: string
   selection_mode: 'single' | 'multiple'
+  applies_to?: 'project' | 'release'
   is_filterable: boolean
 }
 
@@ -57,6 +59,44 @@ export type CopyGameDimensionsResponse = {
   created_values: number
   skipped_values: number
   data: GameDimension[]
+}
+
+export type GameDimensionImportFilterRow = {
+  row: number
+  filter_key: string
+  name: string
+  selection_mode: 'single' | 'multiple'
+  applies_to: 'project' | 'release'
+  is_filterable: boolean
+  is_required: boolean
+  is_active: boolean
+}
+
+export type GameDimensionImportValueRow = {
+  row: number
+  filter_key: string
+  value_key: string
+  name: string
+  parent_key: string | null
+  sort_order: number
+  is_active: boolean
+}
+
+export type GameDimensionImportValidationResponse = {
+  valid: boolean
+  message: string
+  filters: GameDimensionImportFilterRow[]
+  values: GameDimensionImportValueRow[]
+}
+
+export type GameDimensionImportResponse = {
+  message: string
+  total_filters: number
+  total_values: number
+  created_filters: number
+  reused_filters: number
+  created_values: number
+  skipped_values: number
 }
 
 export async function fetchGames(): Promise<ListResponse<GameListItem>> {
@@ -143,6 +183,38 @@ export async function copyGameDimensions(
       source_game_content_type_id: sourceGameContentTypeId,
       dimension_ids: dimensionIds,
     },
+  )
+
+  return response.data
+}
+
+export async function validateGameDimensionImportFile(
+  gameId: number,
+  gameContentTypeId: number,
+  file: File,
+): Promise<GameDimensionImportValidationResponse> {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await http.post<GameDimensionImportValidationResponse>(
+    `${dimensionBaseUrl(gameId, gameContentTypeId)}/import/validate`,
+    formData,
+  )
+
+  return response.data
+}
+
+export async function importGameDimensionFile(
+  gameId: number,
+  gameContentTypeId: number,
+  file: File,
+): Promise<GameDimensionImportResponse> {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const response = await http.post<GameDimensionImportResponse>(
+    `${dimensionBaseUrl(gameId, gameContentTypeId)}/import`,
+    formData,
   )
 
   return response.data

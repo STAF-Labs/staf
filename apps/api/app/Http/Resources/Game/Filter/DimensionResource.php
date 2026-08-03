@@ -18,6 +18,7 @@ class DimensionResource extends JsonResource
             'name' => $this->name,
             'slug' => $this->slug,
             'selection_mode' => $this->selection_mode->value,
+            'applies_to' => $this->applies_to->value,
             'is_filterable' => $this->is_filterable,
             'is_required' => $this->is_required,
             'is_active' => $this->is_active,

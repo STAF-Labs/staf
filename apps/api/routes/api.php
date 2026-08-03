@@ -28,6 +28,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/games/{game}/content-types/{gameContentType}/dimensions', [GameDimensionController::class, 'index']);
     Route::post('/games/{game}/content-types/{gameContentType}/dimensions', [GameDimensionController::class, 'store']);
     Route::post('/games/{game}/content-types/{gameContentType}/dimensions/copy', [GameDimensionController::class, 'copy']);
+    Route::post('/games/{game}/content-types/{gameContentType}/dimensions/import/validate', [GameDimensionController::class, 'validateImport']);
+    Route::post('/games/{game}/content-types/{gameContentType}/dimensions/import', [GameDimensionController::class, 'import']);
     Route::patch('/games/{game}/content-types/{gameContentType}/dimensions/{dimension}', [GameDimensionController::class, 'update']);
     Route::delete('/games/{game}/content-types/{gameContentType}/dimensions/{dimension}', [GameDimensionController::class, 'destroy']);
     Route::post('/games/{game}/content-types/{gameContentType}/dimensions/{dimension}/values', [GameDimensionValueController::class, 'store']);

@@ -4,8 +4,10 @@ namespace App\Models\Game\Project;
 
 use App\Concerns\HasSlug;
 use App\Enums\Project\ProjectReleaseStatus;
+use App\Models\Game\Filter\DimensionValue;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ProjectRelease extends Model
@@ -40,9 +42,17 @@ class ProjectRelease extends Model
         ];
     }
 
-    public function dimensionValues(): HasMany
+    public function dimensionValueLinks(): HasMany
     {
         return $this->hasMany(ProjectReleaseDimensionValue::class);
+    }
+
+    public function dimensionValues(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            DimensionValue::class,
+            'project_release_dimension_values'
+        )->withTimestamps();
     }
 
     protected function slugSourceAttribute(): string
