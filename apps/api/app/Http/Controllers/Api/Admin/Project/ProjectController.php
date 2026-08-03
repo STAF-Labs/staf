@@ -14,13 +14,14 @@ use App\Models\User\User;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 
 class ProjectController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
         $query = Project::query()
-            ->with('gameContentType.game', 'gameContentType.contentType')
+            ->with('gameContentType.game', 'gameContentType.contentType', 'media')
             ->withMax('releases', 'released_at')
             ->latest('id');
 
@@ -86,7 +87,7 @@ class ProjectController extends Controller
     {
         return response()->json(
             ProjectResource::make(
-                $project->load('gameContentType.game', 'gameContentType.contentType')
+                $project->load('gameContentType.game', 'gameContentType.contentType', 'media')
                     ->loadMax('releases', 'released_at')
             )->resolve($request)
         );
@@ -94,11 +95,32 @@ class ProjectController extends Controller
 
     public function store(StoreProjectRequest $request): JsonResponse
     {
-        $project = Project::create($request->validated());
+        $validated = $request->validated();
+        $project = Project::create(Arr::except(
+            $validated,
+            ['logo', 'screenshots', 'licence', 'dimension_value_ids']
+        ));
+
+        $project->addMediaFromRequest('logo')->toMediaCollection('logo');
+
+        foreach ($request->file('screenshots', []) as $screenshot) {
+            $project->addMedia($screenshot)->toMediaCollection('screenshots');
+        }
+
+        if ($request->hasFile('licence')) {
+            $project->addMediaFromRequest('licence')->toMediaCollection('licence');
+        }
+
+        $project->dimensionValues()->sync($validated['dimension_value_ids'] ?? []);
 
         return response()->json(
             ProjectResource::make(
-                $project->load('gameContentType.game', 'gameContentType.contentType')
+                $project->load(
+                    'gameContentType.game',
+                    'gameContentType.contentType',
+                    'media',
+                    'dimensionValues'
+                )
                     ->loadMax('releases', 'released_at')
             )->resolve($request),
             201
@@ -107,11 +129,26 @@ class ProjectController extends Controller
 
     public function update(UpdateProjectRequest $request, Project $project): JsonResponse
     {
-        $project->update($request->validated());
+        $project->update(Arr::except(
+            $request->validated(),
+            ['logo', 'screenshots', 'licence']
+        ));
+
+        if ($request->hasFile('logo')) {
+            $project->addMediaFromRequest('logo')->toMediaCollection('logo');
+        }
+
+        foreach ($request->file('screenshots', []) as $screenshot) {
+            $project->addMedia($screenshot)->toMediaCollection('screenshots');
+        }
+
+        if ($request->hasFile('licence')) {
+            $project->addMediaFromRequest('licence')->toMediaCollection('licence');
+        }
 
         return response()->json(
             ProjectResource::make(
-                $project->load('gameContentType.game', 'gameContentType.contentType')
+                $project->load('gameContentType.game', 'gameContentType.contentType', 'media')
                     ->loadMax('releases', 'released_at')
             )->resolve($request)
         );

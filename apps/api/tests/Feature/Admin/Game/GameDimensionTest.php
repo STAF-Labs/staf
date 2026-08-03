@@ -24,11 +24,13 @@ class GameDimensionTest extends TestCase
             ->postJson($baseUrl, [
                 'name' => 'Платформа',
                 'selection_mode' => 'multiple',
+                'applies_to' => 'release',
                 'is_filterable' => true,
             ])
             ->assertCreated()
             ->assertJsonPath('name', 'Платформа')
             ->assertJsonPath('selection_mode', 'multiple')
+            ->assertJsonPath('applies_to', 'release')
             ->assertJsonPath('values', []);
 
         $dimensionId = $dimensionResponse->json('id');
@@ -100,6 +102,38 @@ class GameDimensionTest extends TestCase
             ->assertNotFound();
     }
 
+    public function test_used_dimension_cannot_change_assignment_level(): void
+    {
+        [$user, $game, $gameContentType] = $this->context();
+        $dimension = $gameContentType->dimensions()->create([
+            'name' => 'Категория',
+            'applies_to' => 'project',
+            'selection_mode' => 'single',
+        ]);
+        $value = $dimension->values()->create(['name' => 'Геймплей']);
+        $project = $gameContentType->projects()->create([
+            'ownerable_type' => User::class,
+            'ownerable_id' => $user->id,
+            'title' => 'Project',
+            'description' => [],
+            'status' => 'draft',
+        ]);
+        $project->dimensionValues()->attach($value->id);
+
+        $this
+            ->actingAs($user)
+            ->patchJson(
+                "/api/games/{$game->id}/content-types/{$gameContentType->id}/dimensions/{$dimension->id}",
+                ['applies_to' => 'release']
+            )
+            ->assertConflict();
+
+        $this->assertDatabaseHas('dimensions', [
+            'id' => $dimension->id,
+            'applies_to' => 'project',
+        ]);
+    }
+
     public function test_copying_dimensions_is_idempotent_and_only_adds_missing_values(): void
     {
         [$user, $game, $targetGameContentType] = $this->context();
@@ -122,6 +156,7 @@ class GameDimensionTest extends TestCase
         $version = $sourceGameContentType->dimensions()->create([
             'name' => 'Версия',
             'selection_mode' => 'single',
+            'applies_to' => 'release',
             'is_filterable' => true,
         ]);
         $version->values()->create(['name' => '1.0', 'sort_order' => 0]);
@@ -159,6 +194,11 @@ class GameDimensionTest extends TestCase
             ->assertJsonPath('skipped_values', 3);
 
         $this->assertSame(2, $targetGameContentType->dimensions()->count());
+        $this->assertDatabaseHas('dimensions', [
+            'game_content_type_id' => $targetGameContentType->id,
+            'name' => 'Версия',
+            'applies_to' => 'release',
+        ]);
         $this->assertSame(
             3,
             Dimension::query()

@@ -29,6 +29,15 @@ class ProjectResource extends JsonResource
             'description' => $this->description,
             'tags' => $this->tags,
             'website_urls' => $this->website_urls,
+            'logo_url' => $this->getFirstMediaUrl('logo') ?: null,
+            'screenshot_urls' => $this->getMedia('screenshots')
+                ->map(fn ($media): string => $media->getUrl())
+                ->values(),
+            'licence_url' => $this->getFirstMediaUrl('licence') ?: null,
+            'dimension_value_ids' => $this->whenLoaded(
+                'dimensionValues',
+                fn () => $this->dimensionValues->pluck('id')->values()
+            ),
             'status' => $this->status?->value,
             'status_label' => $this->status?->getLabel(),
             'status_color' => $this->status?->getColor(),

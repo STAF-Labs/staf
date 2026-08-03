@@ -49,6 +49,10 @@ export type ProjectListItem = {
   description: unknown
   tags: unknown
   website_urls: unknown
+  logo_url: string | null
+  screenshot_urls: string[]
+  licence_url: string | null
+  dimension_value_ids?: number[]
   status: ProjectStatus | null
   status_label: string | null
   status_color: string | null

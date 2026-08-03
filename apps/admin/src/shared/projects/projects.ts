@@ -49,8 +49,57 @@ export async function createProject(payload: CreateProjectPayload): Promise<Proj
   return response.data
 }
 
-export async function updateProject(id: number | string, payload: CreateProjectPayload): Promise<ProjectDetail> {
-  const response = await http.patch<ProjectDetail>(`/api/projects/${id}`, makeProjectPayload(payload))
+export type CreateProjectWizardPayload = {
+  ownerableType: string
+  ownerableId: number
+  gameContentTypeId: number
+  title: string
+  summary: unknown
+  description: unknown
+  tags: string[]
+  websiteUrls: string[]
+  logo: File
+  licence: File | null
+  dimensionValueIds: number[]
+}
+
+export async function createProjectFromWizard(
+  payload: CreateProjectWizardPayload,
+): Promise<ProjectDetail> {
+  const formData = new FormData()
+
+  formData.append('ownerable_type', payload.ownerableType)
+  formData.append('ownerable_id', String(payload.ownerableId))
+  formData.append('game_content_type_id', String(payload.gameContentTypeId))
+  formData.append('title', payload.title)
+  formData.append('summary', JSON.stringify(payload.summary))
+  formData.append('description', JSON.stringify(payload.description))
+  formData.append('status', 'draft')
+  formData.append('logo', payload.logo)
+
+  payload.tags.forEach((tag, index) => formData.append(`tags[${index}]`, tag))
+  payload.websiteUrls.forEach((url, index) => formData.append(`website_urls[${index}]`, url))
+  payload.dimensionValueIds.forEach((valueId, index) =>
+    formData.append(`dimension_value_ids[${index}]`, String(valueId)),
+  )
+
+  if (payload.licence) {
+    formData.append('licence', payload.licence)
+  }
+
+  const response = await http.post<ProjectDetail>('/api/projects', formData)
+
+  return response.data
+}
+
+export async function updateProject(
+  id: number | string,
+  payload: CreateProjectPayload,
+): Promise<ProjectDetail> {
+  const response = await http.patch<ProjectDetail>(
+    `/api/projects/${id}`,
+    makeProjectPayload(payload),
+  )
 
   return response.data
 }

@@ -1,15 +1,23 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { authLoaded, currentUser, fetchCurrentUser } from '../shared/auth/session'
+import {
+  projectBasicsAreComplete,
+  projectDescriptionIsComplete,
+} from '@/shared/projects/project-create'
 import ContentTypesImportView from '@/views/content-types/ContentTypesImportView.vue'
 import ContentTypesView from '@/views/content-types/ContentTypesView.vue'
 import DashboardView from '../views/dashboard/DashboardView.vue'
 import LoginView from '../views/auth/LoginView.vue'
 import UsersView from '../views/users/UsersView.vue'
 import GameFormView from '@/views/games/GameFormView.vue'
+import GameFiltersImportView from '@/views/games/GameFiltersImportView.vue'
 import GameView from '@/views/games/GameView.vue'
 import GamesView from '@/views/games/GamesView.vue'
 import OrganizationsView from '@/views/orgs/OrganizationsView.vue'
 import OrganizationView from '@/views/orgs/OrganizationView.vue'
+import ProjectCreateDetailsView from '@/views/projects/ProjectCreateDetailsView.vue'
+import ProjectCreateNextView from '@/views/projects/ProjectCreateNextView.vue'
+import ProjectGameSelectView from '@/views/projects/ProjectGameSelectView.vue'
 import ProjectFormView from '@/views/projects/ProjectFormView.vue'
 import ProjectsView from '@/views/projects/ProjectsView.vue'
 import UserView from '@/views/users/UserView.vue'
@@ -98,6 +106,19 @@ const router = createRouter({
       },
     },
     {
+      path: '/games/:id/content-types/:gameContentTypeId/filters/import',
+      name: 'games.content-types.filters.import',
+      component: GameFiltersImportView,
+      meta: {
+        breadcrumb: {
+          label: 'Импорт фильтров',
+          parentName: 'games.index',
+        },
+        requiresAuth: true,
+        title: 'Импорт фильтров',
+      },
+    },
+    {
       path: '/games/:id',
       name: 'games.show',
       component: GameView,
@@ -163,11 +184,84 @@ const router = createRouter({
     {
       path: '/projects/create',
       name: 'projects.create',
-      component: ProjectFormView,
+      component: ProjectGameSelectView,
       meta: {
         breadcrumb: {
           label: 'Создание проекта',
           parentName: 'projects.index',
+        },
+        requiresAuth: true,
+        title: 'Создание проекта',
+      },
+    },
+    {
+      path: '/projects/create/:gameId/details',
+      name: 'projects.create.details',
+      component: ProjectCreateDetailsView,
+      meta: {
+        breadcrumb: {
+          label: 'Параметры проекта',
+          parentName: 'projects.create',
+        },
+        requiresAuth: true,
+        title: 'Создание проекта',
+      },
+    },
+    {
+      path: '/projects/create/:gameId/description',
+      name: 'projects.create.description',
+      component: ProjectCreateNextView,
+      beforeEnter: (to) => {
+        const gameId = String(to.params.gameId ?? '')
+
+        return projectBasicsAreComplete(gameId)
+          ? true
+          : { name: 'projects.create.details', params: { gameId } }
+      },
+      meta: {
+        breadcrumb: {
+          label: 'Описание',
+          parentName: 'projects.create',
+        },
+        requiresAuth: true,
+        title: 'Создание проекта',
+      },
+    },
+    {
+      path: '/projects/create/:gameId/licence',
+      name: 'projects.create.licence',
+      component: () => import('@/views/projects/ProjectCreateLicenceView.vue'),
+      beforeEnter: (to) => {
+        const gameId = String(to.params.gameId ?? '')
+
+        return projectDescriptionIsComplete(gameId)
+          ? true
+          : { name: 'projects.create.description', params: { gameId } }
+      },
+      meta: {
+        breadcrumb: {
+          label: 'Лицензия',
+          parentName: 'projects.create',
+        },
+        requiresAuth: true,
+        title: 'Создание проекта',
+      },
+    },
+    {
+      path: '/projects/create/:gameId/continue',
+      name: 'projects.create.continue',
+      component: () => import('@/views/projects/ProjectCreateContinueView.vue'),
+      beforeEnter: (to) => {
+        const gameId = String(to.params.gameId ?? '')
+
+        return projectDescriptionIsComplete(gameId)
+          ? true
+          : { name: 'projects.create.description', params: { gameId } }
+      },
+      meta: {
+        breadcrumb: {
+          label: 'Подтверждение',
+          parentName: 'projects.create',
         },
         requiresAuth: true,
         title: 'Создание проекта',

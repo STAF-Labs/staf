@@ -4,8 +4,8 @@ namespace App\Http\Requests\Admin\Project;
 
 use App\Enums\MembershipStatus;
 use App\Enums\Project\ProjectStatus;
-use App\Models\Org\OrganizationMember;
 use App\Models\Org\Organization;
+use App\Models\Org\OrganizationMember;
 use App\Models\User\User;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -36,6 +36,35 @@ class UpdateProjectRequest extends FormRequest
             'website_urls' => ['nullable', 'array'],
             'website_urls.*' => ['url', 'starts_with:https://'],
             'status' => ['required', Rule::enum(ProjectStatus::class)],
+            'logo' => [
+                'nullable',
+                'file',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'mimetypes:'.implode(',', StoreProjectRequest::imageMimeTypes()),
+                'max:'.StoreProjectRequest::LOGO_MAX_KILOBYTES,
+                Rule::dimensions()
+                    ->maxWidth(StoreProjectRequest::LOGO_MAX_WIDTH)
+                    ->maxHeight(StoreProjectRequest::LOGO_MAX_HEIGHT),
+            ],
+            'screenshots' => ['nullable', 'array', 'max:'.StoreProjectRequest::SCREENSHOTS_MAX_COUNT],
+            'screenshots.*' => [
+                'file',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'mimetypes:'.implode(',', StoreProjectRequest::imageMimeTypes()),
+                'max:'.StoreProjectRequest::SCREENSHOT_MAX_KILOBYTES,
+                Rule::dimensions()
+                    ->maxWidth(StoreProjectRequest::SCREENSHOT_MAX_WIDTH)
+                    ->maxHeight(StoreProjectRequest::SCREENSHOT_MAX_HEIGHT),
+            ],
+            'licence' => [
+                'nullable',
+                'file',
+                'mimes:pdf,txt,md,doc,docx',
+                'mimetypes:'.implode(',', StoreProjectRequest::licenceMimeTypes()),
+                'max:'.StoreProjectRequest::LICENCE_MAX_KILOBYTES,
+            ],
         ];
     }
 
