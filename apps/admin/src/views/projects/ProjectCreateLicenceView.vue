@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ArrowLeft, ArrowRight, FileText, Pencil, Trash2 } from '@lucide/vue'
-import { ref } from 'vue'
+import { ArrowLeft, ArrowRight, FileText, Info, Pencil, Trash2 } from '@lucide/vue'
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppShell from '@/components/layout/AppShell.vue'
 import StepIndicator from '@/components/ui/StepIndicator.vue'
+import { fetchLicences, type LicenceOption } from '@/shared/licences/licences'
 import { projectCreateDraft, projectCreateSteps } from '@/shared/projects/project-create'
 
 const licenceAccept = '.pdf,.txt,.md,.doc,.docx'
@@ -21,7 +22,25 @@ const route = useRoute()
 const router = useRouter()
 const licenceInput = ref<HTMLInputElement | null>(null)
 const licenceError = ref('')
+const licenceOptions = ref<LicenceOption[]>([])
+const licencesLoading = ref(false)
+const licencesError = ref('')
 const gameId = String(route.params.gameId ?? '')
+
+async function loadLicences(): Promise<void> {
+  licencesLoading.value = true
+  licencesError.value = ''
+
+  try {
+    const response = await fetchLicences()
+
+    licenceOptions.value = response.data
+  } catch {
+    licencesError.value = 'Не удалось загрузить список лицензий.'
+  } finally {
+    licencesLoading.value = false
+  }
+}
 
 function chooseLicence(event: Event): void {
   const input = event.target as HTMLInputElement
@@ -82,6 +101,10 @@ async function continueToNextStep(): Promise<void> {
     params: { gameId },
   })
 }
+
+onMounted(() => {
+  void loadLicences()
+})
 </script>
 
 <template>
@@ -117,59 +140,103 @@ async function continueToNextStep(): Promise<void> {
         novalidate
         @submit.prevent="continueToNextStep"
       >
-        <div class="form-field project-create-licence__field">
-          <span class="form-label">Файл лицензии</span>
+        <div class="project-create-licence__content">
+          <div class="project-create-licence__fields">
+            <div class="form-field project-create-licence__field">
+              <span class="form-label">Файл лицензии</span>
 
-          <div
-            class="project-licence-upload"
-            :class="{
-              'project-licence-upload--empty': !projectCreateDraft.licence,
-              'project-licence-upload--invalid': licenceError,
-            }"
-            @click="!projectCreateDraft.licence ? openLicencePicker() : undefined"
-          >
-            <input ref="licenceInput" type="file" :accept="licenceAccept" @change="chooseLicence" />
+              <div
+                class="project-licence-upload"
+                :class="{
+                  'project-licence-upload--empty': !projectCreateDraft.licence,
+                  'project-licence-upload--invalid': licenceError,
+                }"
+                @click="!projectCreateDraft.licence ? openLicencePicker() : undefined"
+              >
+                <input ref="licenceInput" type="file" :accept="licenceAccept" @change="chooseLicence" />
 
-            <span class="project-licence-upload__icon" aria-hidden="true">
-              <FileText :size="28" :stroke-width="1.9" />
-            </span>
+                <span class="project-licence-upload__icon" aria-hidden="true">
+                  <FileText :size="28" :stroke-width="1.9" />
+                </span>
 
-            <span class="project-licence-upload__content">
-              <strong>{{ projectCreateDraft.licence?.name ?? 'Выберите файл' }}</strong>
-              <span>
-                {{
-                  projectCreateDraft.licence
-                    ? formatFileSize(projectCreateDraft.licence.size)
-                    : 'PDF, TXT, MD, DOC или DOCX'
-                }}
+                <span class="project-licence-upload__content">
+                  <strong>{{ projectCreateDraft.licence?.name ?? 'Выберите файл' }}</strong>
+                  <span>
+                    {{
+                      projectCreateDraft.licence
+                        ? formatFileSize(projectCreateDraft.licence.size)
+                        : 'PDF, TXT, MD, DOC или DOCX'
+                    }}
+                  </span>
+                </span>
+
+                <div v-if="projectCreateDraft.licence" class="project-licence-upload__actions">
+                  <button
+                    class="project-licence-upload__action"
+                    type="button"
+                    aria-label="Заменить файл лицензии"
+                    title="Заменить файл"
+                    @click.stop="openLicencePicker"
+                  >
+                    <Pencil :size="17" :stroke-width="2" aria-hidden="true" />
+                  </button>
+                  <button
+                    class="project-licence-upload__action project-licence-upload__action--danger"
+                    type="button"
+                    aria-label="Удалить файл лицензии"
+                    title="Удалить файл"
+                    @click.stop="clearLicence"
+                  >
+                    <Trash2 :size="17" :stroke-width="2" aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+
+              <span class="project-create-licence__help" :class="{ 'field-error': licenceError }">
+                {{ licenceError || 'Необязательный файл размером до 5 МБ.' }}
               </span>
-            </span>
-
-            <div v-if="projectCreateDraft.licence" class="project-licence-upload__actions">
-              <button
-                class="project-licence-upload__action"
-                type="button"
-                aria-label="Заменить файл лицензии"
-                title="Заменить файл"
-                @click.stop="openLicencePicker"
-              >
-                <Pencil :size="17" :stroke-width="2" aria-hidden="true" />
-              </button>
-              <button
-                class="project-licence-upload__action project-licence-upload__action--danger"
-                type="button"
-                aria-label="Удалить файл лицензии"
-                title="Удалить файл"
-                @click.stop="clearLicence"
-              >
-                <Trash2 :size="17" :stroke-width="2" aria-hidden="true" />
-              </button>
             </div>
+
+            <label class="form-field project-create-licence__field">
+              <span class="form-label">Название лицензии</span>
+              <select
+                v-model="projectCreateDraft.licenceName"
+                class="form-control"
+                :disabled="licencesLoading || licencesError !== ''"
+              >
+                <option value="">
+                  {{ licencesLoading ? 'Загрузка…' : licencesError || 'Не выбрана' }}
+                </option>
+                <option
+                  v-for="licence in licenceOptions"
+                  :key="licence.id"
+                  :value="licence.id"
+                >
+                  {{ licence.name }} ({{ licence.id }})
+                </option>
+              </select>
+              <span
+                class="project-create-licence__help"
+                :class="{ 'field-error': licencesError }"
+              >
+                {{ licencesError || 'Выберите точное название из списка, чтобы избежать ошибок.' }}
+              </span>
+            </label>
           </div>
 
-          <span class="project-create-licence__help" :class="{ 'field-error': licenceError }">
-            {{ licenceError || 'Необязательный файл размером до 5 МБ.' }}
-          </span>
+          <aside class="project-create-licence__note" aria-label="Информация о лицензиях">
+            <span class="project-create-licence__note-icon" aria-hidden="true">
+              <Info :size="21" :stroke-width="2" />
+            </span>
+            <div>
+              <strong>О лицензии</strong>
+              <p>
+                Лицензия определяет, как другие пользователи могут использовать, изменять и
+                распространять проект. Для собственной лицензии выберите соответствующий пункт и
+                приложите файл с полным текстом условий.
+              </p>
+            </div>
+          </aside>
         </div>
 
         <div class="project-create-licence__actions">
@@ -215,12 +282,23 @@ async function continueToNextStep(): Promise<void> {
   padding-bottom: 24px;
 }
 
+.project-create-licence__content {
+  display: grid;
+  grid-template-columns: minmax(0, 720px) minmax(260px, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.project-create-licence__fields {
+  min-width: 0;
+}
+
 .project-licence-upload {
   position: relative;
   display: flex;
   align-items: center;
   gap: 14px;
-  width: min(100%, 720px);
+  width: 100%;
   min-height: 96px;
   padding: 16px;
   background: var(--color-bg-soft);
@@ -301,6 +379,39 @@ async function continueToNextStep(): Promise<void> {
   color: var(--color-danger);
 }
 
+.project-create-licence__note {
+  display: flex;
+  gap: 12px;
+  padding: 18px;
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-info) 8%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-info) 24%, var(--color-border));
+  border-radius: var(--radius-md);
+}
+
+.project-create-licence__note-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  color: var(--color-info);
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  border-radius: 50%;
+}
+
+.project-create-licence__note strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.project-create-licence__note p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
 .project-create-licence__actions {
   display: flex;
   justify-content: flex-end;
@@ -312,6 +423,12 @@ async function continueToNextStep(): Promise<void> {
 .project-create-licence__actions .button {
   flex: 0 0 auto;
   width: auto;
+}
+
+@media (max-width: 900px) {
+  .project-create-licence__content {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 520px) {

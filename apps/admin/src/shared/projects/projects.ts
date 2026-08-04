@@ -59,6 +59,7 @@ export type CreateProjectWizardPayload = {
   tags: string[]
   websiteUrls: string[]
   logo: File
+  licenceName: string | null
   licence: File | null
   dimensionValueIds: number[]
 }
@@ -76,6 +77,10 @@ export async function createProjectFromWizard(
   formData.append('description', JSON.stringify(payload.description))
   formData.append('status', 'draft')
   formData.append('logo', payload.logo)
+
+  if (payload.licenceName) {
+    formData.append('licence_name', payload.licenceName)
+  }
 
   payload.tags.forEach((tag, index) => formData.append(`tags[${index}]`, tag))
   payload.websiteUrls.forEach((url, index) => formData.append(`website_urls[${index}]`, url))
@@ -115,6 +120,7 @@ function makeProjectPayload(payload: CreateProjectPayload): Record<string, unkno
     description: payload.description,
     tags: payload.tags,
     website_urls: payload.websiteUrls,
+    ...(payload.licenceName !== undefined ? { licence_name: payload.licenceName } : {}),
     status: payload.status,
   }
 }
