@@ -13,7 +13,6 @@ enum ProjectStatus: string
     case ON_MODERATION = 'on_moderation';
     case PUBLISHED = 'published';
     case REJECTED = 'rejected';
-    case ARCHIVED = 'archived';
 
     public function getLabel(): string|Htmlable|null
     {
@@ -27,7 +26,6 @@ enum ProjectStatus: string
             self::ON_MODERATION => 'warning',
             self::PUBLISHED => 'success',
             self::REJECTED => 'danger',
-            self::ARCHIVED => 'info',
         };
     }
 }

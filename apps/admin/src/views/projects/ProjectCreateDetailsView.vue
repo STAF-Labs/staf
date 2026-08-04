@@ -16,6 +16,7 @@ import type { ComponentPublicInstance } from 'vue'
 import { computed, nextTick, onBeforeUnmount, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppShell from '@/components/layout/AppShell.vue'
+import ProjectCompletionCard from '@/components/ProjectCompletionCard.vue'
 import StepIndicator from '@/components/ui/StepIndicator.vue'
 import {
   fetchGame,
@@ -25,10 +26,14 @@ import {
   type GameDimension,
 } from '@/shared/games/games'
 import {
+  calculateProjectPercentageComplete,
+  hydrateProjectCreateDraft,
   projectCreateDraft,
   projectCreateSteps,
+  resetProjectCreateDraft,
   selectProjectGame,
 } from '@/shared/projects/project-create'
+import { fetchProjectOwnerOptions, saveProjectDetails } from '@/shared/projects/projects'
 import '@/assets/styles/game-form.css'
 
 const imageMimeTypes = ['image/jpeg', 'image/png', 'image/webp']
@@ -42,6 +47,7 @@ const router = useRouter()
 const gameName = ref('')
 const message = ref('')
 const isLoading = ref(false)
+const isSaving = ref(false)
 const isFiltersLoading = ref(false)
 const filtersLoadFailed = ref(false)
 const contentTypeOptions = ref<GameContentTypeListItem[]>([])
@@ -57,6 +63,16 @@ const showFilterErrors = ref(false)
 const websiteUrlInputs = ref<HTMLInputElement[]>([])
 
 const gameId = computed(() => String(route.params.gameId ?? ''))
+const routeProjectId = computed(() => {
+  const projectId = Number(route.query.projectId)
+
+  return Number.isInteger(projectId) && projectId > 0 ? projectId : null
+})
+
+if (routeProjectId.value === null && projectCreateDraft.projectId !== null) {
+  resetProjectCreateDraft()
+}
+
 selectProjectGame(gameId.value)
 
 const form = projectCreateDraft
@@ -73,13 +89,6 @@ const summaryEditor = useEditor({
     form.summaryFilled = !editor.isEmpty
     summaryError.value = ''
   },
-})
-
-void nextTick(() => {
-  if (form.summary && summaryEditor.value) {
-    summaryEditor.value.commands.setContent(form.summary)
-    form.summaryFilled = !summaryEditor.value.isEmpty
-  }
 })
 
 async function loadGame(): Promise<void> {
@@ -133,6 +142,22 @@ async function loadProjectDimensions(gameContentTypeId: number): Promise<void> {
     form.requiredProjectDimensionIds = projectDimensions.value
       .filter((dimension) => dimension.is_required)
       .map((dimension) => dimension.id)
+
+    if (form.persistedDimensionValueIds.length > 0) {
+      for (const dimension of projectDimensions.value) {
+        const availableValueIds = new Set(dimension.values.map((value) => value.id))
+        const selectedValueIds = form.persistedDimensionValueIds.filter((valueId) =>
+          availableValueIds.has(valueId),
+        )
+
+        if (selectedValueIds.length > 0) {
+          form.dimensionValueIds[dimension.id] = selectedValueIds
+        }
+      }
+
+      form.persistedDimensionValueIds = []
+    }
+
     initializeDimensionPaths()
   } catch {
     filtersLoadFailed.value = true
@@ -354,6 +379,7 @@ function openLogoPicker(): void {
 
 function clearLogo(): void {
   form.logo = null
+  form.logoUrl = null
   logoError.value = ''
   setLogoPreview(null)
 
@@ -363,7 +389,7 @@ function clearLogo(): void {
 }
 
 function setLogoPreview(url: string | null): void {
-  if (logoPreviewUrl.value) {
+  if (logoPreviewUrl.value?.startsWith('blob:')) {
     URL.revokeObjectURL(logoPreviewUrl.value)
   }
 
@@ -418,7 +444,7 @@ async function continueToNextStep(): Promise<void> {
     titleError.value = 'Введите название проекта.'
   }
 
-  if (!form.logo) {
+  if (!form.logo && !form.logoUrl) {
     logoError.value = 'Логотип обязателен.'
   }
 
@@ -453,21 +479,75 @@ async function continueToNextStep(): Promise<void> {
   form.summary = editor.getJSON()
   form.summaryFilled = true
 
-  await router.push({
-    name: 'projects.create.description',
-    params: { gameId: gameId.value },
-  })
+  isSaving.value = true
+  message.value = ''
+
+  try {
+    const ownerOptions = form.projectId === null ? await fetchProjectOwnerOptions() : null
+    const owner = ownerOptions?.data[0]
+
+    if ((form.projectId === null && !owner) || !form.gameContentTypeId) {
+      throw new Error('Не удалось определить владельца проекта.')
+    }
+
+    const project = await saveProjectDetails(form.projectId, {
+      ownerableType: owner?.type,
+      ownerableId: owner?.id,
+      gameContentTypeId: form.gameContentTypeId,
+      title: form.title,
+      summary: form.summary,
+      tags: form.tags,
+      websiteUrls: form.websiteUrls.filter(Boolean),
+      logo: form.logo,
+      dimensionValueIds: [...new Set(Object.values(form.dimensionValueIds).flat())],
+      percentageComplete: calculateProjectPercentageComplete(),
+    })
+
+    form.projectId = project.id
+    form.logoUrl = project.logo_url
+
+    await router.push({
+      name: 'projects.create.description',
+      params: { gameId: gameId.value },
+      query: { projectId: String(project.id) },
+    })
+  } catch (error) {
+    message.value = error instanceof Error ? error.message : 'Не удалось сохранить черновик.'
+  } finally {
+    isSaving.value = false
+  }
+}
+
+async function loadPage(): Promise<void> {
+  try {
+    if (routeProjectId.value !== null) {
+      await hydrateProjectCreateDraft(routeProjectId.value)
+    }
+  } catch {
+    message.value = 'Не удалось загрузить сохранённый черновик.'
+
+    return
+  }
+
+  setLogoPreview(form.logo ? URL.createObjectURL(form.logo) : form.logoUrl)
+
+  if (form.summary && summaryEditor.value) {
+    summaryEditor.value.commands.setContent(form.summary)
+    form.summaryFilled = !summaryEditor.value.isEmpty
+  }
+
+  await loadGame()
 }
 
 onBeforeUnmount(() => {
-  if (logoPreviewUrl.value) {
+  if (logoPreviewUrl.value?.startsWith('blob:')) {
     URL.revokeObjectURL(logoPreviewUrl.value)
   }
 
   summaryEditor.value?.destroy()
 })
 
-void loadGame()
+void loadPage()
 </script>
 
 <template>
@@ -497,11 +577,12 @@ void loadGame()
 
       <p v-if="message" class="data-page__message">{{ message }}</p>
 
-      <form
-        class="project-form-panel form project-create-details__form"
-        novalidate
-        @submit.prevent="continueToNextStep"
-      >
+      <div class="project-create-layout">
+        <form
+          class="project-form-panel form project-create-details__form"
+          novalidate
+          @submit.prevent="continueToNextStep"
+        >
         <p v-if="isLoading" class="project-form-loading">Загрузка...</p>
 
         <label
@@ -783,12 +864,15 @@ void loadGame()
             <span>Назад</span>
           </RouterLink>
 
-          <button class="button button-primary" type="submit">
-            <span>Далее</span>
+          <button class="button button-primary" type="submit" :disabled="isSaving">
+            <span>{{ isSaving ? 'Сохранение…' : 'Далее' }}</span>
             <ArrowRight :size="18" :stroke-width="1.9" aria-hidden="true" />
           </button>
         </div>
-      </form>
+        </form>
+
+        <ProjectCompletionCard />
+      </div>
     </section>
   </AppShell>
 </template>

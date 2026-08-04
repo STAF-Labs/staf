@@ -14,6 +14,7 @@ export type {
   ProjectDetail,
   ProjectListItem,
   ProjectOwnerOption,
+  ProjectPublicationStatus,
   ProjectStatus,
 } from './project'
 export type { ListResponse, UserDetail, UserListItem } from './user'

@@ -1,18 +1,32 @@
 <script setup lang="ts">
 import { ArrowLeft, ArrowRight, Info } from '@lucide/vue'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppShell from '@/components/layout/AppShell.vue'
+import ProjectCompletionCard from '@/components/ProjectCompletionCard.vue'
 import StepIndicator from '@/components/ui/StepIndicator.vue'
 import { fetchLicences, type LicenceOption } from '@/shared/licences/licences'
-import { projectCreateDraft, projectCreateSteps } from '@/shared/projects/project-create'
+import {
+  calculateProjectPercentageComplete,
+  hydrateProjectCreateDraft,
+  projectCreateDraft,
+  projectCreateSteps,
+} from '@/shared/projects/project-create'
+import { updateProjectDraft } from '@/shared/projects/projects'
 
 const route = useRoute()
 const router = useRouter()
 const licenceOptions = ref<LicenceOption[]>([])
 const licencesLoading = ref(false)
 const licencesError = ref('')
+const message = ref('')
+const isSaving = ref(false)
 const gameId = String(route.params.gameId ?? '')
+const routeProjectId = computed(() => {
+  const projectId = Number(route.query.projectId)
+
+  return Number.isInteger(projectId) && projectId > 0 ? projectId : null
+})
 
 async function loadLicences(): Promise<void> {
   licencesLoading.value = true
@@ -30,14 +44,47 @@ async function loadLicences(): Promise<void> {
 }
 
 async function continueToNextStep(): Promise<void> {
-  await router.push({
-    name: 'projects.create.continue',
-    params: { gameId },
-  })
+  if (!projectCreateDraft.projectId) {
+    message.value = 'Сначала сохраните основные данные проекта.'
+
+    return
+  }
+
+  isSaving.value = true
+  message.value = ''
+
+  try {
+    await updateProjectDraft(projectCreateDraft.projectId, {
+      licenceName: projectCreateDraft.licenceName || null,
+      percentageComplete: calculateProjectPercentageComplete(),
+    })
+
+    await router.push({
+      name: 'projects.create.continue',
+      params: { gameId },
+      query: { projectId: String(projectCreateDraft.projectId) },
+    })
+  } catch (error) {
+    message.value = error instanceof Error ? error.message : 'Не удалось сохранить лицензию.'
+  } finally {
+    isSaving.value = false
+  }
+}
+
+async function loadPage(): Promise<void> {
+  try {
+    if (routeProjectId.value !== null) {
+      await hydrateProjectCreateDraft(routeProjectId.value)
+    }
+  } catch {
+    message.value = 'Не удалось загрузить сохранённый черновик.'
+  }
+
+  await loadLicences()
 }
 
 onMounted(() => {
-  void loadLicences()
+  void loadPage()
 })
 </script>
 
@@ -50,6 +97,7 @@ onMounted(() => {
           :to="{
             name: 'projects.create.description',
             params: { gameId },
+            query: routeProjectId ? { projectId: String(routeProjectId) } : undefined,
           }"
           aria-label="Вернуться к описанию"
         >
@@ -69,11 +117,14 @@ onMounted(() => {
         aria-label="Этапы создания проекта"
       />
 
-      <form
-        class="project-form-panel form project-create-licence__form"
-        novalidate
-        @submit.prevent="continueToNextStep"
-      >
+      <p v-if="message" class="data-page__message">{{ message }}</p>
+
+      <div class="project-create-layout">
+        <form
+          class="project-form-panel form project-create-licence__form"
+          novalidate
+          @submit.prevent="continueToNextStep"
+        >
         <div class="project-create-licence__content">
           <div class="project-create-licence__fields">
             <label class="form-field project-create-licence__field">
@@ -124,18 +175,22 @@ onMounted(() => {
             :to="{
               name: 'projects.create.description',
               params: { gameId },
+              query: routeProjectId ? { projectId: String(routeProjectId) } : undefined,
             }"
           >
             <ArrowLeft :size="18" :stroke-width="1.9" aria-hidden="true" />
             <span>Назад</span>
           </RouterLink>
 
-          <button class="button button-primary" type="submit">
-            <span>Далее</span>
+          <button class="button button-primary" type="submit" :disabled="isSaving">
+            <span>{{ isSaving ? 'Сохранение…' : 'Далее' }}</span>
             <ArrowRight :size="18" :stroke-width="1.9" aria-hidden="true" />
           </button>
         </div>
-      </form>
+        </form>
+
+        <ProjectCompletionCard />
+      </div>
     </section>
   </AppShell>
 </template>

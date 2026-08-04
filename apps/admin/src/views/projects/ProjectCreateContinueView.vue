@@ -5,6 +5,7 @@ import { EditorContent, useEditor } from '@tiptap/vue-3'
 import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppShell from '@/components/layout/AppShell.vue'
+import ProjectCompletionCard from '@/components/ProjectCompletionCard.vue'
 import StepIndicator from '@/components/ui/StepIndicator.vue'
 import {
   fetchGame,
@@ -12,8 +13,10 @@ import {
   fetchGameDimensions,
   type GameDimension,
 } from '@/shared/games/games'
-import { createProjectFromWizard, fetchProjectOwnerOptions } from '@/shared/projects/projects'
+import { updateProjectDraft } from '@/shared/projects/projects'
 import {
+  calculateProjectPercentageComplete,
+  hydrateProjectCreateDraft,
   projectCreateDraft,
   projectCreateSteps,
   resetProjectCreateDraft,
@@ -28,7 +31,13 @@ const dimensions = ref<GameDimension[]>([])
 const message = ref('')
 const isLoading = ref(false)
 const isSaving = ref(false)
-const logoPreviewUrl = URL.createObjectURL(projectCreateDraft.logo as File)
+const logoPreviewUrl = ref<string | null>(null)
+const percentageComplete = computed(() => calculateProjectPercentageComplete())
+const routeProjectId = computed(() => {
+  const projectId = Number(route.query.projectId)
+
+  return Number.isInteger(projectId) && projectId > 0 ? projectId : null
+})
 
 const selectedDimensions = computed(() =>
   dimensions.value
@@ -53,20 +62,28 @@ const descriptionEditor = useEditor({
   editable: false,
 })
 
-void nextTick(() => {
-  if (summaryEditor.value && projectCreateDraft.summary) {
-    summaryEditor.value.commands.setContent(projectCreateDraft.summary)
-  }
-
-  if (descriptionEditor.value && projectCreateDraft.description) {
-    descriptionEditor.value.commands.setContent(projectCreateDraft.description)
-  }
-})
-
 async function loadPreviewContext(): Promise<void> {
   isLoading.value = true
 
   try {
+    if (routeProjectId.value !== null) {
+      await hydrateProjectCreateDraft(routeProjectId.value)
+    }
+
+    logoPreviewUrl.value = projectCreateDraft.logo
+      ? URL.createObjectURL(projectCreateDraft.logo)
+      : projectCreateDraft.logoUrl
+
+    await nextTick()
+
+    if (summaryEditor.value && projectCreateDraft.summary) {
+      summaryEditor.value.commands.setContent(projectCreateDraft.summary)
+    }
+
+    if (descriptionEditor.value && projectCreateDraft.description) {
+      descriptionEditor.value.commands.setContent(projectCreateDraft.description)
+    }
+
     const [game, contentTypesResponse, dimensionsResponse] = await Promise.all([
       fetchGame(gameId),
       fetchGameContentTypes(gameId),
@@ -81,6 +98,24 @@ async function loadPreviewContext(): Promise<void> {
     dimensions.value = dimensionsResponse.data.filter(
       (dimension) => dimension.is_active && dimension.applies_to === 'project',
     )
+    projectCreateDraft.requiredProjectDimensionIds = dimensions.value
+      .filter((dimension) => dimension.is_required)
+      .map((dimension) => dimension.id)
+
+    if (projectCreateDraft.persistedDimensionValueIds.length > 0) {
+      for (const dimension of dimensions.value) {
+        const availableValueIds = new Set(dimension.values.map((value) => value.id))
+        const selectedValueIds = projectCreateDraft.persistedDimensionValueIds.filter((valueId) =>
+          availableValueIds.has(valueId),
+        )
+
+        if (selectedValueIds.length > 0) {
+          projectCreateDraft.dimensionValueIds[dimension.id] = selectedValueIds
+        }
+      }
+
+      projectCreateDraft.persistedDimensionValueIds = []
+    }
   } catch {
     message.value = 'Не удалось загрузить данные для подтверждения.'
   } finally {
@@ -103,7 +138,7 @@ function dimensionValuePath(dimension: GameDimension, valueId: number): string {
 }
 
 async function saveProject(): Promise<void> {
-  if (!projectCreateDraft.gameContentTypeId || !projectCreateDraft.logo) {
+  if (!projectCreateDraft.projectId || percentageComplete.value !== 100) {
     message.value = 'Черновик проекта заполнен не полностью.'
 
     return
@@ -113,25 +148,10 @@ async function saveProject(): Promise<void> {
   message.value = ''
 
   try {
-    const ownerOptions = await fetchProjectOwnerOptions()
-    const owner = ownerOptions.data[0]
-
-    if (!owner) {
-      throw new Error('Не удалось определить владельца проекта.')
-    }
-
-    await createProjectFromWizard({
-      ownerableType: owner.type,
-      ownerableId: owner.id,
-      gameContentTypeId: projectCreateDraft.gameContentTypeId,
-      title: projectCreateDraft.title,
-      summary: projectCreateDraft.summary,
-      description: projectCreateDraft.description,
-      tags: projectCreateDraft.tags,
-      websiteUrls: projectCreateDraft.websiteUrls.filter(Boolean),
-      logo: projectCreateDraft.logo,
-      licenceName: projectCreateDraft.licenceName || null,
-      dimensionValueIds: [...new Set(Object.values(projectCreateDraft.dimensionValueIds).flat())],
+    await updateProjectDraft(projectCreateDraft.projectId, {
+      percentageComplete: percentageComplete.value,
+      publicationStatus: 'public',
+      status: 'published',
     })
 
     resetProjectCreateDraft()
@@ -144,7 +164,9 @@ async function saveProject(): Promise<void> {
 }
 
 onBeforeUnmount(() => {
-  URL.revokeObjectURL(logoPreviewUrl)
+  if (projectCreateDraft.logo && logoPreviewUrl.value) {
+    URL.revokeObjectURL(logoPreviewUrl.value)
+  }
   summaryEditor.value?.destroy()
   descriptionEditor.value?.destroy()
 })
@@ -161,6 +183,7 @@ void loadPreviewContext()
           :to="{
             name: 'projects.create.licence',
             params: { gameId },
+            query: routeProjectId ? { projectId: String(routeProjectId) } : undefined,
           }"
           aria-label="Вернуться к лицензии"
         >
@@ -182,11 +205,16 @@ void loadPreviewContext()
 
       <p v-if="message" class="data-page__message">{{ message }}</p>
 
-      <div class="project-form-panel project-confirmation">
+      <div class="project-create-layout">
+        <div class="project-form-panel project-confirmation">
         <p v-if="isLoading" class="project-form-loading">Загрузка...</p>
 
         <div class="project-confirmation__group project-confirmation__identity">
-          <img class="project-confirmation__logo" :src="logoPreviewUrl" alt="Логотип проекта" />
+          <img
+            class="project-confirmation__logo"
+            :src="logoPreviewUrl ?? undefined"
+            alt="Логотип проекта"
+          />
           <div>
             <span>{{ gameName }} · {{ contentTypeName }}</span>
             <h3>{{ projectCreateDraft.title }}</h3>
@@ -242,6 +270,7 @@ void loadPreviewContext()
             :to="{
               name: 'projects.create.licence',
               params: { gameId },
+              query: routeProjectId ? { projectId: String(routeProjectId) } : undefined,
             }"
           >
             <ArrowLeft :size="18" :stroke-width="1.9" aria-hidden="true" />
@@ -255,9 +284,12 @@ void loadPreviewContext()
             @click="saveProject"
           >
             <Save :size="18" :stroke-width="1.9" aria-hidden="true" />
-            <span>{{ isSaving ? 'Сохранение…' : 'Сохранить' }}</span>
+            <span>{{ isSaving ? 'Публикация…' : 'Опубликовать' }}</span>
           </button>
         </div>
+        </div>
+
+        <ProjectCompletionCard />
       </div>
     </section>
   </AppShell>

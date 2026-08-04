@@ -1,4 +1,6 @@
-export type ProjectStatus = 'draft' | 'on_moderation' | 'published' | 'rejected' | 'archived'
+export type ProjectStatus = 'draft' | 'on_moderation' | 'published' | 'rejected'
+
+export type ProjectPublicationStatus = 'public' | 'private' | 'url_only' | 'archived'
 
 export type ContentTypeListItem = {
   id: number
@@ -42,6 +44,7 @@ export type ProjectListItem = {
   id: number
   ownerable_type: string
   ownerable_id: number
+  owner_name: string | null
   game_content_type_id: number
   title: string
   slug: string
@@ -53,6 +56,10 @@ export type ProjectListItem = {
   screenshot_urls: string[]
   licence_name: string | null
   dimension_value_ids?: number[]
+  percentage_complete: number
+  publication_status: ProjectPublicationStatus
+  publication_status_label: string | null
+  publication_status_color: string | null
   status: ProjectStatus | null
   status_label: string | null
   status_color: string | null
@@ -61,6 +68,7 @@ export type ProjectListItem = {
   content_type_name: string | null
   released_at: string | null
   created_at: string | null
+  updated_at: string | null
 }
 
 export type ProjectDetail = ProjectListItem
@@ -104,5 +112,7 @@ export type CreateProjectPayload = {
   tags: unknown
   websiteUrls: HttpsUrl[] | null
   licenceName?: string | null
+  percentageComplete?: number
+  publicationStatus?: ProjectPublicationStatus
   status: ProjectStatus
 }

@@ -7,6 +7,8 @@ import type {
   ProjectDetail,
   ProjectListItem,
   ProjectOwnerOption,
+  ProjectPublicationStatus,
+  ProjectStatus,
 } from '@staf/contracts'
 
 export type {
@@ -16,6 +18,7 @@ export type {
   ProjectDetail,
   ProjectListItem,
   ProjectOwnerOption,
+  ProjectPublicationStatus,
   ProjectStatus,
 } from '@staf/contracts'
 
@@ -49,45 +52,75 @@ export async function createProject(payload: CreateProjectPayload): Promise<Proj
   return response.data
 }
 
-export type CreateProjectWizardPayload = {
-  ownerableType: string
-  ownerableId: number
+export type SaveProjectDetailsPayload = {
+  ownerableType?: string
+  ownerableId?: number
   gameContentTypeId: number
   title: string
   summary: unknown
-  description: unknown
   tags: string[]
   websiteUrls: string[]
-  logo: File
-  licenceName: string | null
+  logo: File | null
   dimensionValueIds: number[]
+  percentageComplete: number
 }
 
-export async function createProjectFromWizard(
-  payload: CreateProjectWizardPayload,
+export async function saveProjectDetails(
+  projectId: number | null,
+  payload: SaveProjectDetailsPayload,
 ): Promise<ProjectDetail> {
   const formData = new FormData()
 
-  formData.append('ownerable_type', payload.ownerableType)
-  formData.append('ownerable_id', String(payload.ownerableId))
+  if (projectId === null && payload.ownerableType && payload.ownerableId) {
+    formData.append('ownerable_type', payload.ownerableType)
+    formData.append('ownerable_id', String(payload.ownerableId))
+  }
+
   formData.append('game_content_type_id', String(payload.gameContentTypeId))
   formData.append('title', payload.title)
   formData.append('summary', JSON.stringify(payload.summary))
-  formData.append('description', JSON.stringify(payload.description))
-  formData.append('status', 'draft')
-  formData.append('logo', payload.logo)
-
-  if (payload.licenceName) {
-    formData.append('licence_name', payload.licenceName)
+  formData.append('percentage_complete', String(payload.percentageComplete))
+  if (payload.logo) {
+    formData.append('logo', payload.logo)
   }
 
-  payload.tags.forEach((tag, index) => formData.append(`tags[${index}]`, tag))
-  payload.websiteUrls.forEach((url, index) => formData.append(`website_urls[${index}]`, url))
-  payload.dimensionValueIds.forEach((valueId, index) =>
-    formData.append(`dimension_value_ids[${index}]`, String(valueId)),
+  formData.append('tags', JSON.stringify(payload.tags))
+  formData.append('website_urls', JSON.stringify(payload.websiteUrls))
+  formData.append('dimension_value_ids', JSON.stringify(payload.dimensionValueIds))
+
+  if (projectId !== null) {
+    formData.append('_method', 'PATCH')
+  }
+
+  const response = await http.post<ProjectDetail>(
+    projectId === null ? '/api/projects' : `/api/projects/${projectId}`,
+    formData,
   )
 
-  const response = await http.post<ProjectDetail>('/api/projects', formData)
+  return response.data
+}
+
+export type UpdateProjectDraftPayload = {
+  description?: unknown
+  licenceName?: string | null
+  percentageComplete: number
+  publicationStatus?: ProjectPublicationStatus
+  status?: ProjectStatus
+}
+
+export async function updateProjectDraft(
+  id: number | string,
+  payload: UpdateProjectDraftPayload,
+): Promise<ProjectDetail> {
+  const response = await http.patch<ProjectDetail>(`/api/projects/${id}`, {
+    ...(payload.description !== undefined ? { description: payload.description } : {}),
+    ...(payload.licenceName !== undefined ? { licence_name: payload.licenceName } : {}),
+    percentage_complete: payload.percentageComplete,
+    ...(payload.publicationStatus !== undefined
+      ? { publication_status: payload.publicationStatus }
+      : {}),
+    ...(payload.status !== undefined ? { status: payload.status } : {}),
+  })
 
   return response.data
 }
@@ -116,6 +149,12 @@ function makeProjectPayload(payload: CreateProjectPayload): Record<string, unkno
     tags: payload.tags,
     website_urls: payload.websiteUrls,
     ...(payload.licenceName !== undefined ? { licence_name: payload.licenceName } : {}),
+    ...(payload.percentageComplete !== undefined
+      ? { percentage_complete: payload.percentageComplete }
+      : {}),
+    ...(payload.publicationStatus !== undefined
+      ? { publication_status: payload.publicationStatus }
+      : {}),
     status: payload.status,
   }
 }

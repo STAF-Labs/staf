@@ -3,6 +3,7 @@
 namespace App\Models\Game\Project;
 
 use App\Concerns\HasSlug;
+use App\Enums\Project\ProjectPublicationStatus;
 use App\Enums\Project\ProjectStatus;
 use App\Models\Game\ContentType\GameContentType;
 use App\Models\Game\Filter\DimensionValue;
@@ -32,8 +33,15 @@ class Project extends Model implements HasMedia
         'tags',
         'website_urls',
         'licence_name',
-
+        'percentage_complete',
+        'publication_status',
         'status',
+    ];
+
+    protected $attributes = [
+        'percentage_complete' => 0,
+        'publication_status' => ProjectPublicationStatus::PRIVATE->value,
+        'status' => ProjectStatus::DRAFT->value,
     ];
 
     public function ownerable(): MorphTo
@@ -48,6 +56,8 @@ class Project extends Model implements HasMedia
     {
         return [
             'description' => 'json:unicode',
+            'percentage_complete' => 'integer',
+            'publication_status' => ProjectPublicationStatus::class,
             'status' => ProjectStatus::class,
             'summary' => 'json:unicode',
             'tags' => 'json:unicode',

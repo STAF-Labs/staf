@@ -132,6 +132,11 @@ class ProjectMediaTest extends TestCase
             'sort_order' => 1,
             'is_active' => true,
         ]);
+        $replacementValue = $dimension->values()->create([
+            'name' => 'Технологии',
+            'sort_order' => 2,
+            'is_active' => true,
+        ]);
         $payload = [
             ...$this->projectPayload($user, $gameContentType),
             'logo' => UploadedFile::fake()->image('logo.png', 512, 512),
@@ -157,6 +162,32 @@ class ProjectMediaTest extends TestCase
             'project_id' => Project::query()->firstOrFail()->id,
             'dimension_value_id' => $value->id,
         ]);
+
+        $project = Project::query()->firstOrFail();
+
+        $this
+            ->actingAs($user)
+            ->getJson("/api/projects/{$project->id}")
+            ->assertOk()
+            ->assertJsonPath('dimension_value_ids.0', $value->id)
+            ->assertJson(fn ($json) => $json->whereType('logo_url', 'string')->etc());
+
+        $this
+            ->actingAs($user)
+            ->patchJson("/api/projects/{$project->id}", [
+                'dimension_value_ids' => [$replacementValue->id],
+            ])
+            ->assertOk()
+            ->assertJsonPath('dimension_value_ids.0', $replacementValue->id);
+
+        $this->assertDatabaseMissing('project_dimension_values', [
+            'project_id' => $project->id,
+            'dimension_value_id' => $value->id,
+        ]);
+        $this->assertDatabaseHas('project_dimension_values', [
+            'project_id' => $project->id,
+            'dimension_value_id' => $replacementValue->id,
+        ]);
     }
 
     public function test_logo_is_replaced_and_screenshots_are_multiple(): void
@@ -178,6 +209,32 @@ class ProjectMediaTest extends TestCase
 
         $this->assertCount(1, $project->getMedia('logo'));
         $this->assertCount(2, $project->getMedia('screenshots'));
+        $this->assertSame('new-logo', $project->getFirstMedia('logo')?->name);
+    }
+
+    public function test_logo_can_be_replaced_during_partial_draft_update(): void
+    {
+        Storage::fake('public');
+
+        [$user, $gameContentType] = $this->projectContext();
+        $project = Project::query()->create($this->projectPayload($user, $gameContentType));
+        $project->addMedia(UploadedFile::fake()->image('old-logo.png', 256, 256))
+            ->toMediaCollection('logo');
+
+        $this
+            ->actingAs($user)
+            ->post("/api/projects/{$project->id}", [
+                '_method' => 'PATCH',
+                'logo' => UploadedFile::fake()->image('new-logo.png', 512, 512),
+            ], [
+                'Accept' => 'application/json',
+            ])
+            ->assertOk()
+            ->assertJsonPath('title', 'Media Project');
+
+        $project->refresh();
+
+        $this->assertCount(1, $project->getMedia('logo'));
         $this->assertSame('new-logo', $project->getFirstMedia('logo')?->name);
     }
 

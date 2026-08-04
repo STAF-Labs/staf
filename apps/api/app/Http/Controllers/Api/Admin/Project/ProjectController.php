@@ -12,6 +12,7 @@ use App\Models\Game\Project\Project;
 use App\Models\Org\OrganizationMember;
 use App\Models\User\User;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -21,7 +22,14 @@ class ProjectController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = Project::query()
-            ->with('gameContentType.game', 'gameContentType.contentType', 'media')
+            ->with([
+                'ownerable' => fn (MorphTo $morphTo) => $morphTo->morphWith([
+                    User::class => ['userProfile'],
+                ]),
+                'gameContentType.game',
+                'gameContentType.contentType',
+                'media',
+            ])
             ->withMax('releases', 'released_at')
             ->latest('id');
 
@@ -87,7 +95,16 @@ class ProjectController extends Controller
     {
         return response()->json(
             ProjectResource::make(
-                $project->load('gameContentType.game', 'gameContentType.contentType', 'media')
+                $project->load(
+                    'ownerable',
+                    'gameContentType.game',
+                    'gameContentType.contentType',
+                    'media',
+                    'dimensionValues'
+                )
+                    ->loadMorph('ownerable', [
+                        User::class => ['userProfile'],
+                    ])
                     ->loadMax('releases', 'released_at')
             )->resolve($request)
         );
@@ -112,11 +129,15 @@ class ProjectController extends Controller
         return response()->json(
             ProjectResource::make(
                 $project->load(
+                    'ownerable',
                     'gameContentType.game',
                     'gameContentType.contentType',
                     'media',
                     'dimensionValues'
                 )
+                    ->loadMorph('ownerable', [
+                        User::class => ['userProfile'],
+                    ])
                     ->loadMax('releases', 'released_at')
             )->resolve($request),
             201
@@ -125,9 +146,10 @@ class ProjectController extends Controller
 
     public function update(UpdateProjectRequest $request, Project $project): JsonResponse
     {
+        $validated = $request->validated();
         $project->update(Arr::except(
-            $request->validated(),
-            ['logo', 'screenshots']
+            $validated,
+            ['logo', 'screenshots', 'dimension_value_ids']
         ));
 
         if ($request->hasFile('logo')) {
@@ -138,11 +160,25 @@ class ProjectController extends Controller
             $project->addMedia($screenshot)->toMediaCollection('screenshots');
         }
 
+        if (array_key_exists('dimension_value_ids', $validated)) {
+            $project->dimensionValues()->sync($validated['dimension_value_ids'] ?? []);
+        }
+
         return response()->json(
             ProjectResource::make(
-                $project->load('gameContentType.game', 'gameContentType.contentType', 'media')
+                $project->load(
+                    'ownerable',
+                    'gameContentType.game',
+                    'gameContentType.contentType',
+                    'media',
+                    'dimensionValues'
+                )
+                    ->loadMorph('ownerable', [
+                        User::class => ['userProfile'],
+                    ])
                     ->loadMax('releases', 'released_at')
             )->resolve($request)
         );
     }
+
 }

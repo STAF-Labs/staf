@@ -19,6 +19,7 @@ import ProjectCreateDetailsView from '@/views/projects/ProjectCreateDetailsView.
 import ProjectCreateNextView from '@/views/projects/ProjectCreateNextView.vue'
 import ProjectGameSelectView from '@/views/projects/ProjectGameSelectView.vue'
 import ProjectFormView from '@/views/projects/ProjectFormView.vue'
+import ProjectPreviewView from '@/views/projects/ProjectPreviewView.vue'
 import ProjectsView from '@/views/projects/ProjectsView.vue'
 import UserView from '@/views/users/UserView.vue'
 
@@ -213,6 +214,11 @@ const router = createRouter({
       component: ProjectCreateNextView,
       beforeEnter: (to) => {
         const gameId = String(to.params.gameId ?? '')
+        const projectId = Number(to.query.projectId)
+
+        if (Number.isInteger(projectId) && projectId > 0) {
+          return true
+        }
 
         return projectBasicsAreComplete(gameId)
           ? true
@@ -233,6 +239,11 @@ const router = createRouter({
       component: () => import('@/views/projects/ProjectCreateLicenceView.vue'),
       beforeEnter: (to) => {
         const gameId = String(to.params.gameId ?? '')
+        const projectId = Number(to.query.projectId)
+
+        if (Number.isInteger(projectId) && projectId > 0) {
+          return true
+        }
 
         return projectDescriptionIsComplete(gameId)
           ? true
@@ -253,6 +264,11 @@ const router = createRouter({
       component: () => import('@/views/projects/ProjectCreateContinueView.vue'),
       beforeEnter: (to) => {
         const gameId = String(to.params.gameId ?? '')
+        const projectId = Number(to.query.projectId)
+
+        if (Number.isInteger(projectId) && projectId > 0) {
+          return true
+        }
 
         return projectDescriptionIsComplete(gameId)
           ? true
@@ -265,6 +281,19 @@ const router = createRouter({
         },
         requiresAuth: true,
         title: 'Создание проекта',
+      },
+    },
+    {
+      path: '/projects/:id',
+      name: 'projects.show',
+      component: ProjectPreviewView,
+      meta: {
+        breadcrumb: {
+          label: 'Превью',
+          parentName: 'projects.index',
+        },
+        requiresAuth: true,
+        title: 'Превью проекта',
       },
     },
     {

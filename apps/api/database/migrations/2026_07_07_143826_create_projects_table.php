@@ -20,12 +20,14 @@ return new class extends Migration
             $table->string('title', 128);
             $table->string('slug', 128)->unique();
             $table->jsonb('summary')->nullable();
-            $table->jsonb('description');
+            $table->jsonb('description')->nullable();
             $table->jsonb('tags')->nullable();
             $table->jsonb('website_urls')->nullable();
             $table->string('licence_name', 128)->nullable();
 
-            $table->string('status', 32)->default('on_moderation');
+            $table->unsignedTinyInteger('percentage_complete')->default(0);
+            $table->string('publication_status', 32)->default('private')->index();
+            $table->string('status', 32)->default('draft')->index();
 
             $table->timestampsTz();
         });

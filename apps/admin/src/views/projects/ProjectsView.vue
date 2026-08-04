@@ -15,7 +15,6 @@ const statusFilterOptions: Array<{ value: StatusFilter; label: string }> = [
   { value: 'on_moderation', label: 'На модерации' },
   { value: 'published', label: 'Опубликован' },
   { value: 'rejected', label: 'Отклонён' },
-  { value: 'archived', label: 'В архиве' },
 ]
 const sortOptions: Array<{ value: SortOption; label: string }> = [
   { value: 'title_asc', label: 'А-Я' },

@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Admin\Project;
 
 use App\Enums\MembershipStatus;
-use App\Enums\Project\ProjectStatus;
 use App\Models\Game\Filter\Dimension;
 use App\Models\Org\Organization;
 use App\Models\Org\OrganizationMember;
@@ -54,13 +53,13 @@ class StoreProjectRequest extends FormRequest
             'title' => ['required', 'string', 'max:128'],
             'slug' => ['nullable', 'string', 'max:128', 'unique:projects,slug'],
             'summary' => ['nullable', 'array'],
-            'description' => ['required', 'array'],
+            'description' => ['nullable', 'array'],
             'tags' => ['nullable', 'array'],
             'tags.*' => ['string', 'min:3'],
             'website_urls' => ['nullable', 'array'],
             'website_urls.*' => ['url', 'starts_with:https://'],
             'licence_name' => ['nullable', 'string', 'max:128', Rule::in($licenceCatalog->identifiers())],
-            'status' => ['required', Rule::enum(ProjectStatus::class)],
+            'percentage_complete' => ['sometimes', 'integer', 'between:0,100'],
             'dimension_value_ids' => ['nullable', 'array'],
             'dimension_value_ids.*' => ['integer', 'distinct', Rule::exists('dimension_values', 'id')],
             'logo' => [
@@ -132,7 +131,7 @@ class StoreProjectRequest extends FormRequest
     {
         $decoded = [];
 
-        foreach (['summary', 'description'] as $field) {
+        foreach (['summary', 'description', 'tags', 'website_urls', 'dimension_value_ids'] as $field) {
             $value = $this->input($field);
 
             if (! is_string($value)) {

@@ -33,7 +33,6 @@ const statusOptions: Array<{ value: ProjectStatus, label: string }> = [
   { value: 'on_moderation', label: 'На модерации' },
   { value: 'published', label: 'Опубликован' },
   { value: 'rejected', label: 'Отклонён' },
-  { value: 'archived', label: 'В архиве' },
 ]
 
 const route = useRoute()

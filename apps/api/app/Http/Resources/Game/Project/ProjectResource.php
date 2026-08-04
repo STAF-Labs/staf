@@ -3,6 +3,8 @@
 namespace App\Http\Resources\Game\Project;
 
 use App\Models\Game\Project\Project;
+use App\Models\Org\Organization;
+use App\Models\User\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -22,6 +24,13 @@ class ProjectResource extends JsonResource
             'id' => $this->id,
             'ownerable_type' => $this->ownerable_type,
             'ownerable_id' => $this->ownerable_id,
+            'owner_name' => $this->whenLoaded('ownerable', fn (): ?string => match (true) {
+                $this->ownerable instanceof User => $this->ownerable->relationLoaded('userProfile')
+                    ? ($this->ownerable->userProfile?->display_name ?: $this->ownerable->username)
+                    : $this->ownerable->username,
+                $this->ownerable instanceof Organization => $this->ownerable->name,
+                default => null,
+            }),
             'game_content_type_id' => $this->game_content_type_id,
             'title' => $this->title,
             'slug' => $this->slug,
@@ -38,6 +47,10 @@ class ProjectResource extends JsonResource
                 'dimensionValues',
                 fn () => $this->dimensionValues->pluck('id')->values()
             ),
+            'percentage_complete' => $this->percentage_complete,
+            'publication_status' => $this->publication_status?->value,
+            'publication_status_label' => $this->publication_status?->getLabel(),
+            'publication_status_color' => $this->publication_status?->getColor(),
             'status' => $this->status?->value,
             'status_label' => $this->status?->getLabel(),
             'status_color' => $this->status?->getColor(),
@@ -46,6 +59,7 @@ class ProjectResource extends JsonResource
             'content_type_name' => $this->gameContentType?->contentType?->name,
             'released_at' => $this->releases_max_released_at,
             'created_at' => $this->created_at?->toISOString(),
+            'updated_at' => $this->updated_at?->toISOString(),
         ];
     }
 }
