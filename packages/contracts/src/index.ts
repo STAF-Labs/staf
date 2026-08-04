@@ -1,4 +1,5 @@
 export type { CreateGamePayload, GameDetail, GameListItem, GameStatus } from './game'
+export type { LicenceOption } from './licence'
 export type { OrganizationDetail, OrganizationListItem } from './organization'
 export type {
   CreateContentTypePayload,

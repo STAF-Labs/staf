@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\Admin\Game\GameContentTypeController;
 use App\Http\Controllers\Api\Admin\Game\GameController;
 use App\Http\Controllers\Api\Admin\Game\GameDimensionController;
 use App\Http\Controllers\Api\Admin\Game\GameDimensionValueController;
+use App\Http\Controllers\Api\Admin\Licence\LicenceController;
 use App\Http\Controllers\Api\Admin\Org\OrganizationController;
 use App\Http\Controllers\Api\Admin\Project\ProjectController;
 use App\Http\Controllers\Api\Admin\User\UserController;
@@ -45,6 +46,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/content-types/import', [ContentTypeController::class, 'import']);
     Route::get('/game-content-types', [ProjectController::class, 'contentTypes']);
     Route::get('/project-owner-options', [ProjectController::class, 'ownerOptions']);
+    Route::get('/licences', [LicenceController::class, 'index']);
     Route::get('/projects', [ProjectController::class, 'index']);
     Route::post('/projects', [ProjectController::class, 'store']);
     Route::get('/projects/{project}', [ProjectController::class, 'show']);
