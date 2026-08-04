@@ -31,6 +31,7 @@ class Project extends Model implements HasMedia
         'description',
         'tags',
         'website_urls',
+        'licence_name',
 
         'status',
     ];

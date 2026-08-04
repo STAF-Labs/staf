@@ -23,6 +23,7 @@ return new class extends Migration
             $table->jsonb('description');
             $table->jsonb('tags')->nullable();
             $table->jsonb('website_urls')->nullable();
+            $table->string('licence_name', 128)->nullable();
 
             $table->string('status', 32)->default('on_moderation');
 

@@ -7,6 +7,7 @@ use App\Enums\Project\ProjectStatus;
 use App\Models\Org\Organization;
 use App\Models\Org\OrganizationMember;
 use App\Models\User\User;
+use App\Services\Admin\Licence\SpdxLicenceCatalog;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -21,7 +22,7 @@ class UpdateProjectRequest extends FormRequest
     /**
      * @return array<string, list<mixed>>
      */
-    public function rules(): array
+    public function rules(SpdxLicenceCatalog $licenceCatalog): array
     {
         return [
             'ownerable_type' => ['required', 'string', Rule::in([User::class, Organization::class])],
@@ -35,6 +36,7 @@ class UpdateProjectRequest extends FormRequest
             'tags.*' => ['string', 'min:3'],
             'website_urls' => ['nullable', 'array'],
             'website_urls.*' => ['url', 'starts_with:https://'],
+            'licence_name' => ['nullable', 'string', 'max:128', Rule::in($licenceCatalog->identifiers())],
             'status' => ['required', Rule::enum(ProjectStatus::class)],
             'logo' => [
                 'nullable',

@@ -36,11 +36,13 @@ class ProjectMediaTest extends TestCase
                     'LICENCE.pdf',
                     "%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF"
                 ),
+                'licence_name' => 'MIT',
             ]);
 
         $response
             ->assertCreated()
             ->assertJsonPath('title', 'Media Project')
+            ->assertJsonPath('licence_name', 'MIT')
             ->assertJsonCount(2, 'screenshot_urls')
             ->assertJson(fn ($json) => $json
                 ->whereType('logo_url', 'string')
@@ -51,6 +53,7 @@ class ProjectMediaTest extends TestCase
 
         $project = Project::query()->firstOrFail();
 
+        $this->assertSame('MIT', $project->licence_name);
         $this->assertCount(1, $project->getMedia('logo'));
         $this->assertCount(2, $project->getMedia('screenshots'));
         $this->assertCount(1, $project->getMedia('licence'));
@@ -65,6 +68,54 @@ class ProjectMediaTest extends TestCase
             ->postJson('/api/projects', $this->projectPayload($user, $gameContentType))
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['logo']);
+    }
+
+    public function test_admin_can_update_project_licence_name(): void
+    {
+        [$user, $gameContentType] = $this->projectContext();
+        $project = Project::query()->create([
+            ...$this->projectPayload($user, $gameContentType),
+            'licence_name' => 'MIT',
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->patchJson("/api/projects/{$project->id}", [
+                ...$this->projectPayload($user, $gameContentType),
+                'licence_name' => 'Apache-2.0',
+            ])
+            ->assertOk()
+            ->assertJsonPath('licence_name', 'Apache-2.0');
+
+        $this->assertSame('Apache-2.0', $project->refresh()->licence_name);
+    }
+
+    public function test_licence_name_cannot_exceed_128_characters(): void
+    {
+        [$user, $gameContentType] = $this->projectContext();
+
+        $this
+            ->actingAs($user)
+            ->postJson('/api/projects', [
+                ...$this->projectPayload($user, $gameContentType),
+                'licence_name' => str_repeat('a', 129),
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['licence_name']);
+    }
+
+    public function test_licence_name_must_be_from_catalogue(): void
+    {
+        [$user, $gameContentType] = $this->projectContext();
+
+        $this
+            ->actingAs($user)
+            ->postJson('/api/projects', [
+                ...$this->projectPayload($user, $gameContentType),
+                'licence_name' => 'mit licence',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['licence_name']);
     }
 
     public function test_admin_must_select_required_project_dimension_and_it_is_saved(): void

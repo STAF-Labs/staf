@@ -51,6 +51,7 @@ export type ProjectListItem = {
   website_urls: unknown
   logo_url: string | null
   screenshot_urls: string[]
+  licence_name: string | null
   licence_url: string | null
   dimension_value_ids?: number[]
   status: ProjectStatus | null
@@ -103,5 +104,6 @@ export type CreateProjectPayload = {
   description: unknown
   tags: unknown
   websiteUrls: HttpsUrl[] | null
+  licenceName?: string | null
   status: ProjectStatus
 }
