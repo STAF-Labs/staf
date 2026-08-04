@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Eye, Pencil, Plus, RotateCcw, SlidersHorizontal, Trash2 } from '@lucide/vue'
+import { Pencil, Plus, RotateCcw, SlidersHorizontal, Trash2 } from '@lucide/vue'
 import { computed, onMounted, ref } from 'vue'
 import AppShell from '@/components/layout/AppShell.vue'
 import DeleteModal from '@/components/ui/DeleteModal.vue'
@@ -288,8 +288,8 @@ onMounted(() => {
           <article v-for="game in visibleGames" :key="game.id" class="game-card">
             <RouterLink
               class="game-card__link"
-              :to="{ name: 'games.edit', params: { id: String(game.id) } }"
-              :aria-label="`Редактировать игру ${game.name}`"
+              :to="{ name: 'games.show', params: { id: String(game.id) } }"
+              :aria-label="`Просмотреть игру ${game.name}`"
             >
               <span class="game-card__media">
                 <img
@@ -306,15 +306,6 @@ onMounted(() => {
             </RouterLink>
 
             <div class="game-card__actions" aria-label="Действия игры">
-              <RouterLink
-                class="game-card__action"
-                :to="{ name: 'games.show', params: { id: String(game.id) } }"
-                aria-label="Просмотр игры"
-                title="Просмотр игры"
-              >
-                <Eye :size="16" :stroke-width="2" aria-hidden="true" />
-              </RouterLink>
-
               <RouterLink
                 class="game-card__action"
                 :to="{ name: 'games.edit', params: { id: String(game.id) } }"
