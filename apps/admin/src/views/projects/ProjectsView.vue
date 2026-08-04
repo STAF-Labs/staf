@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { Plus, RotateCcw, SlidersHorizontal } from '@lucide/vue'
+import { Pencil, Plus, RotateCcw, SlidersHorizontal, Trash2 } from '@lucide/vue'
 import AppShell from '@/components/layout/AppShell.vue'
 import SearchField from '@/components/ui/SearchField.vue'
 import { fetchGames, type GameListItem } from '@/shared/games/games'
@@ -145,6 +145,52 @@ function releaseTimestamp(project: ProjectListItem): number {
   return new Date(project.released_at).getTime()
 }
 
+function projectSummary(project: ProjectListItem): string {
+  return richTextToPlainText(project.summary) || 'Краткое описание пока не добавлено.'
+}
+
+function projectTags(project: ProjectListItem): string[] {
+  if (!Array.isArray(project.tags)) {
+    return []
+  }
+
+  return project.tags.filter((tag): tag is string => typeof tag === 'string' && tag.trim() !== '')
+}
+
+function projectUpdatedAt(project: ProjectListItem): string {
+  if (!project.updated_at) {
+    return 'Дата не указана'
+  }
+
+  return new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short' }).format(
+    new Date(project.updated_at),
+  )
+}
+
+function projectStatusClass(project: ProjectListItem): string {
+  const color = project.status_color ?? 'gray'
+
+  return ['gray', 'warning', 'success', 'danger'].includes(color)
+    ? `project-card__status--${color}`
+    : 'project-card__status--gray'
+}
+
+function richTextToPlainText(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.map(richTextToPlainText).filter(Boolean).join(' ')
+  }
+
+  if (!value || typeof value !== 'object') {
+    return ''
+  }
+
+  if ('text' in value && typeof value.text === 'string') {
+    return value.text
+  }
+
+  return 'content' in value ? richTextToPlainText(value.content) : ''
+}
+
 function resetFilters(): void {
   search.value = ''
   gameFilter.value = 'all'
@@ -272,6 +318,7 @@ onMounted(() => {
             :to="{ name: 'projects.create' }"
             aria-label="Добавить проект"
           >
+            <span class="project-card__add-media" aria-hidden="true"></span>
             <Plus
               class="project-card__add-icon"
               :size="58"
@@ -285,16 +332,71 @@ onMounted(() => {
           <article v-for="project in visibleProjects" :key="project.id" class="project-card">
             <RouterLink
               class="project-card__link"
-              :to="{ name: 'projects.edit', params: { id: String(project.id) } }"
-              :aria-label="`Редактировать проект ${project.title}`"
+              :to="{ name: 'projects.show', params: { id: String(project.id) } }"
+              :aria-label="`Открыть превью проекта ${project.title}`"
             >
               <span class="project-card__media">
-                <span class="project-card__placeholder">{{
-                  project.title.slice(0, 1).toUpperCase()
-                }}</span>
-                <span class="project-card__name">{{ project.title }}</span>
+                <img
+                  v-if="project.logo_url"
+                  class="project-card__image"
+                  :src="project.logo_url"
+                  :alt="`Изображение проекта ${project.title}`"
+                />
+                <span v-else class="project-card__placeholder">
+                  {{ project.title.slice(0, 1).toUpperCase() }}
+                </span>
+              </span>
+
+              <span class="project-card__body">
+                <span class="project-card__heading">
+                  <strong class="project-card__title">{{ project.title }}</strong>
+                  <span v-if="project.owner_name" class="project-card__author">
+                    by {{ project.owner_name }}
+                  </span>
+                </span>
+                <span class="project-card__summary">{{ projectSummary(project) }}</span>
+
+                <span class="project-card__badges" aria-label="Теги проекта">
+                  <span
+                    v-for="tag in projectTags(project)"
+                    :key="tag"
+                    class="project-card__badge"
+                  >
+                    {{ tag }}
+                  </span>
+                </span>
+
+                <span class="project-card__footer">
+                  <span class="project-card__updated-at">{{ projectUpdatedAt(project) }}</span>
+                </span>
               </span>
             </RouterLink>
+
+            <div class="project-card__actions" aria-label="Действия проекта">
+              <span class="project-card__status" :class="projectStatusClass(project)">
+                {{ project.status_label ?? project.status ?? 'Статус не указан' }}
+              </span>
+
+              <button
+                class="project-card__action"
+                type="button"
+                disabled
+                aria-label="Редактировать проект"
+                title="Редактирование пока недоступно"
+              >
+                <Pencil :size="16" :stroke-width="2" aria-hidden="true" />
+              </button>
+
+              <button
+                class="project-card__action project-card__action--danger"
+                type="button"
+                disabled
+                aria-label="Удалить проект"
+                title="Удаление пока недоступно"
+              >
+                <Trash2 :size="16" :stroke-width="2" aria-hidden="true" />
+              </button>
+            </div>
           </article>
         </div>
 
@@ -326,3 +428,221 @@ onMounted(() => {
     </section>
   </AppShell>
 </template>
+
+<style scoped>
+.project-card:not(.project-card--add, .project-card--loading) {
+  min-height: 0;
+  aspect-ratio: auto;
+  background: var(--color-surface);
+}
+
+.project-card:not(.project-card--add, .project-card--loading):hover,
+.project-card:not(.project-card--add, .project-card--loading):focus-within {
+  transform: translateY(-2px);
+}
+
+.project-card--add {
+  grid-template-rows: auto 176px;
+  place-items: stretch;
+  min-height: 0;
+  padding: 0;
+  aspect-ratio: auto;
+}
+
+.project-card__add-media {
+  width: 100%;
+  aspect-ratio: 16 / 8;
+}
+
+.project-card--add .project-card__add-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.project-card__link {
+  display: grid;
+  grid-template-rows: auto 176px;
+}
+
+.project-card__actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+
+.project-card__status,
+.project-card__action {
+  min-height: 34px;
+  color: var(--color-primary-text);
+  background: color-mix(in srgb, var(--color-surface) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.project-card__status {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.project-card__status--gray {
+  color: var(--color-text-muted);
+}
+
+.project-card__status--warning {
+  color: var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-warning) 42%, transparent);
+}
+
+.project-card__status--success {
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 42%, transparent);
+}
+
+.project-card__status--danger {
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 42%, transparent);
+}
+
+.project-card__action {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  padding: 0;
+  border-radius: var(--radius-sm);
+}
+
+.project-card__action:disabled {
+  cursor: not-allowed;
+}
+
+.project-card__action--danger {
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 42%, transparent);
+}
+
+.project-card__media {
+  aspect-ratio: 16 / 8;
+  height: auto;
+  min-height: 0;
+  background:
+    linear-gradient(145deg, transparent 42%, color-mix(in srgb, var(--color-text) 5%, transparent) 43% 57%, transparent 58%),
+    linear-gradient(35deg, var(--color-bg-soft), color-mix(in srgb, var(--color-text) 7%, var(--color-bg-soft)));
+  border-bottom: 1px solid var(--color-border-soft);
+  border-radius: 0;
+}
+
+.project-card__media::after {
+  display: none;
+}
+
+.project-card__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.project-card__placeholder {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-surface) 78%, transparent);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  font-size: 26px;
+}
+
+.project-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  padding: 16px;
+}
+
+.project-card__heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.project-card__title {
+  color: var(--color-text);
+  font-size: 16px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.project-card__author {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-card__summary {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 16px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.project-card__badges {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  min-height: 26px;
+  overflow: hidden;
+  padding-top: 3px;
+}
+
+.project-card__badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  flex: 0 0 auto;
+  padding: 3px 9px;
+  color: var(--color-primary-text);
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.project-card__footer {
+  display: flex;
+  align-items: end;
+  justify-content: flex-end;
+  min-height: 20px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.project-card__updated-at {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+</style>
