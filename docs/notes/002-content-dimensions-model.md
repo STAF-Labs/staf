@@ -1,5 +1,7 @@
 # Content Dimensions Data Model
 
+Статус: сделано.
+
 ## Current Decision
 
 Content types are global, but filters/dimensions are not global.
@@ -30,9 +32,9 @@ These are separate `dimensions` rows even if the visible name is the same.
 
 Do not rebuild CRUD/API around global dimensions plus a pivot table. New filter management should create and manage dimensions under a selected `game_content_type`.
 
-## Next Backend Direction
+## Implemented Backend
 
-The next API layer should likely be nested under a game content type, for example:
+API dimensions реализован вложенным в конкретный game content type:
 
 ```text
 GET    /games/{game}/content-types/{gameContentType}/dimensions
@@ -41,4 +43,4 @@ PATCH  /games/{game}/content-types/{gameContentType}/dimensions/{dimension}
 DELETE /games/{game}/content-types/{gameContentType}/dimensions/{dimension}
 ```
 
-Dimension values should be managed under the dimension they belong to.
+Dimension values управляются внутри принадлежащей им dimension.
