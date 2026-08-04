@@ -32,10 +32,6 @@ class ProjectMediaTest extends TestCase
                     UploadedFile::fake()->image('first.png', 1280, 720),
                     UploadedFile::fake()->image('second.png', 1920, 1080),
                 ],
-                'licence' => UploadedFile::fake()->createWithContent(
-                    'LICENCE.pdf',
-                    "%PDF-1.4\n1 0 obj\n<<>>\nendobj\n%%EOF"
-                ),
                 'licence_name' => 'MIT',
             ]);
 
@@ -46,7 +42,6 @@ class ProjectMediaTest extends TestCase
             ->assertJsonCount(2, 'screenshot_urls')
             ->assertJson(fn ($json) => $json
                 ->whereType('logo_url', 'string')
-                ->whereType('licence_url', 'string')
                 ->whereType('screenshot_urls.0', 'string')
                 ->whereType('screenshot_urls.1', 'string')
                 ->etc());
@@ -56,7 +51,6 @@ class ProjectMediaTest extends TestCase
         $this->assertSame('MIT', $project->licence_name);
         $this->assertCount(1, $project->getMedia('logo'));
         $this->assertCount(2, $project->getMedia('screenshots'));
-        $this->assertCount(1, $project->getMedia('licence'));
     }
 
     public function test_logo_is_required_when_creating_project(): void
@@ -165,7 +159,7 @@ class ProjectMediaTest extends TestCase
         ]);
     }
 
-    public function test_single_project_media_are_replaced_and_screenshots_are_multiple(): void
+    public function test_logo_is_replaced_and_screenshots_are_multiple(): void
     {
         Storage::fake('public');
 
@@ -180,19 +174,11 @@ class ProjectMediaTest extends TestCase
             ->toMediaCollection('screenshots');
         $project->addMedia(UploadedFile::fake()->image('second.png', 1280, 720))
             ->toMediaCollection('screenshots');
-        $project->addMedia(UploadedFile::fake()->createWithContent('old.txt', 'Old licence'))
-            ->toMediaCollection('licence');
-        $project->unsetRelation('media');
-        $project->addMedia(UploadedFile::fake()->createWithContent('new.txt', 'New licence'))
-            ->toMediaCollection('licence');
-
         $project->refresh();
 
         $this->assertCount(1, $project->getMedia('logo'));
         $this->assertCount(2, $project->getMedia('screenshots'));
-        $this->assertCount(1, $project->getMedia('licence'));
         $this->assertSame('new-logo', $project->getFirstMedia('logo')?->name);
-        $this->assertSame('new', $project->getFirstMedia('licence')?->name);
     }
 
     /**

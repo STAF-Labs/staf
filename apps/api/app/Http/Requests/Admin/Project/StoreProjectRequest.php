@@ -29,28 +29,12 @@ class StoreProjectRequest extends FormRequest
 
     public const SCREENSHOTS_MAX_COUNT = 20;
 
-    public const LICENCE_MAX_KILOBYTES = 5120;
-
     /**
      * @return list<string>
      */
     public static function imageMimeTypes(): array
     {
         return ['image/jpeg', 'image/png', 'image/webp'];
-    }
-
-    /**
-     * @return list<string>
-     */
-    public static function licenceMimeTypes(): array
-    {
-        return [
-            'application/msword',
-            'application/pdf',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            'text/markdown',
-            'text/plain',
-        ];
     }
 
     public function authorize(): bool
@@ -100,13 +84,6 @@ class StoreProjectRequest extends FormRequest
                 Rule::dimensions()
                     ->maxWidth(self::SCREENSHOT_MAX_WIDTH)
                     ->maxHeight(self::SCREENSHOT_MAX_HEIGHT),
-            ],
-            'licence' => [
-                'nullable',
-                'file',
-                'mimes:pdf,txt,md,doc,docx',
-                'mimetypes:'.implode(',', self::licenceMimeTypes()),
-                'max:'.self::LICENCE_MAX_KILOBYTES,
             ],
         ];
     }

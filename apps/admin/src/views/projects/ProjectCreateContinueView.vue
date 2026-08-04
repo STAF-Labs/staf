@@ -131,7 +131,6 @@ async function saveProject(): Promise<void> {
       websiteUrls: projectCreateDraft.websiteUrls.filter(Boolean),
       logo: projectCreateDraft.logo,
       licenceName: projectCreateDraft.licenceName || null,
-      licence: projectCreateDraft.licence,
       dimensionValueIds: [...new Set(Object.values(projectCreateDraft.dimensionValueIds).flat())],
     })
 
@@ -234,16 +233,7 @@ void loadPreviewContext()
 
         <div class="project-confirmation__group">
           <span class="form-label">Лицензия</span>
-          <dl class="project-confirmation__licence">
-            <div>
-              <dt>Название</dt>
-              <dd>{{ projectCreateDraft.licenceName || 'Не выбрана' }}</dd>
-            </div>
-            <div>
-              <dt>Файл</dt>
-              <dd>{{ projectCreateDraft.licence?.name ?? 'Не приложен' }}</dd>
-            </div>
-          </dl>
+          <p>{{ projectCreateDraft.licenceName || 'Не выбрана' }}</p>
         </div>
 
         <div class="project-confirmation__actions">
@@ -366,26 +356,6 @@ void loadPreviewContext()
   color: var(--color-text-muted);
 }
 
-.project-confirmation__licence {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-}
-
-.project-confirmation__licence div {
-  display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
-  gap: 12px;
-}
-
-.project-confirmation__licence dt {
-  color: var(--color-text-muted);
-}
-
-.project-confirmation__licence dd {
-  margin: 0;
-}
-
 .project-confirmation__list {
   display: grid;
   gap: 6px;
@@ -412,8 +382,7 @@ void loadPreviewContext()
 
 @media (max-width: 600px) {
   .project-confirmation__identity,
-  .project-confirmation__dimensions > div,
-  .project-confirmation__licence div {
+  .project-confirmation__dimensions > div {
     grid-template-columns: 1fr;
   }
 

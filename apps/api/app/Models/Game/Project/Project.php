@@ -96,17 +96,6 @@ class Project extends Model implements HasMedia
                 fn (File $file): bool => str_starts_with($file->mimeType, 'image/')
             );
 
-        $this->addMediaCollection('licence')
-            ->acceptsFile(
-                fn (File $file): bool => in_array($file->mimeType, [
-                    'application/msword',
-                    'application/pdf',
-                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                    'text/markdown',
-                    'text/plain',
-                ], true)
-            )
-            ->singleFile();
     }
 
     protected function slugSourceAttribute(): string

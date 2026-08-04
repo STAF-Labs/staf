@@ -60,13 +60,6 @@ class UpdateProjectRequest extends FormRequest
                     ->maxWidth(StoreProjectRequest::SCREENSHOT_MAX_WIDTH)
                     ->maxHeight(StoreProjectRequest::SCREENSHOT_MAX_HEIGHT),
             ],
-            'licence' => [
-                'nullable',
-                'file',
-                'mimes:pdf,txt,md,doc,docx',
-                'mimetypes:'.implode(',', StoreProjectRequest::licenceMimeTypes()),
-                'max:'.StoreProjectRequest::LICENCE_MAX_KILOBYTES,
-            ],
         ];
     }
 

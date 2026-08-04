@@ -98,17 +98,13 @@ class ProjectController extends Controller
         $validated = $request->validated();
         $project = Project::create(Arr::except(
             $validated,
-            ['logo', 'screenshots', 'licence', 'dimension_value_ids']
+            ['logo', 'screenshots', 'dimension_value_ids']
         ));
 
         $project->addMediaFromRequest('logo')->toMediaCollection('logo');
 
         foreach ($request->file('screenshots', []) as $screenshot) {
             $project->addMedia($screenshot)->toMediaCollection('screenshots');
-        }
-
-        if ($request->hasFile('licence')) {
-            $project->addMediaFromRequest('licence')->toMediaCollection('licence');
         }
 
         $project->dimensionValues()->sync($validated['dimension_value_ids'] ?? []);
@@ -131,7 +127,7 @@ class ProjectController extends Controller
     {
         $project->update(Arr::except(
             $request->validated(),
-            ['logo', 'screenshots', 'licence']
+            ['logo', 'screenshots']
         ));
 
         if ($request->hasFile('logo')) {
@@ -140,10 +136,6 @@ class ProjectController extends Controller
 
         foreach ($request->file('screenshots', []) as $screenshot) {
             $project->addMedia($screenshot)->toMediaCollection('screenshots');
-        }
-
-        if ($request->hasFile('licence')) {
-            $project->addMediaFromRequest('licence')->toMediaCollection('licence');
         }
 
         return response()->json(

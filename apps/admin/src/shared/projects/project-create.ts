@@ -18,7 +18,6 @@ export type ProjectCreateDraft = {
   description: unknown
   descriptionFilled: boolean
   licenceName: string
-  licence: File | null
   dimensionValueIds: Record<number, number[]>
   requiredProjectDimensionIds: number[]
   tagInput: string
@@ -36,7 +35,6 @@ export const projectCreateDraft = reactive<ProjectCreateDraft>({
   description: null,
   descriptionFilled: false,
   licenceName: '',
-  licence: null,
   dimensionValueIds: {},
   requiredProjectDimensionIds: [],
   tagInput: '',
@@ -59,7 +57,6 @@ export function selectProjectGame(gameId: string): void {
     description: null,
     descriptionFilled: false,
     licenceName: '',
-    licence: null,
     dimensionValueIds: {},
     requiredProjectDimensionIds: [],
     tagInput: '',
@@ -79,7 +76,6 @@ export function resetProjectCreateDraft(): void {
     description: null,
     descriptionFilled: false,
     licenceName: '',
-    licence: null,
     dimensionValueIds: {},
     requiredProjectDimensionIds: [],
     tagInput: '',

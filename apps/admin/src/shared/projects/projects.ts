@@ -60,7 +60,6 @@ export type CreateProjectWizardPayload = {
   websiteUrls: string[]
   logo: File
   licenceName: string | null
-  licence: File | null
   dimensionValueIds: number[]
 }
 
@@ -87,10 +86,6 @@ export async function createProjectFromWizard(
   payload.dimensionValueIds.forEach((valueId, index) =>
     formData.append(`dimension_value_ids[${index}]`, String(valueId)),
   )
-
-  if (payload.licence) {
-    formData.append('licence', payload.licence)
-  }
 
   const response = await http.post<ProjectDetail>('/api/projects', formData)
 

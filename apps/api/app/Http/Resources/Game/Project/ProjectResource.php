@@ -34,7 +34,6 @@ class ProjectResource extends JsonResource
                 ->map(fn ($media): string => $media->getUrl())
                 ->values(),
             'licence_name' => $this->licence_name,
-            'licence_url' => $this->getFirstMediaUrl('licence') ?: null,
             'dimension_value_ids' => $this->whenLoaded(
                 'dimensionValues',
                 fn () => $this->dimensionValues->pluck('id')->values()
