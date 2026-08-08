@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Admin\Project;
 
+use App\Enums\CommonStatus;
 use App\Models\Game\ContentType\ContentType;
 use App\Models\Game\ContentType\GameContentType;
 use App\Models\Game\Filter\Dimension;
@@ -75,7 +76,6 @@ class ProjectMediaTest extends TestCase
         $this
             ->actingAs($user)
             ->patchJson("/api/projects/{$project->id}", [
-                ...$this->projectPayload($user, $gameContentType),
                 'licence_name' => 'Apache-2.0',
             ])
             ->assertOk()
@@ -247,6 +247,7 @@ class ProjectMediaTest extends TestCase
             'username' => 'admin',
             'email' => 'admin@example.com',
             'password' => 'password',
+            'status' => CommonStatus::ACTIVE,
         ]);
         $game = Game::query()->create([
             'name' => 'Media Game',

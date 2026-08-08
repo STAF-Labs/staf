@@ -7,6 +7,8 @@ use App\Enums\Project\ProjectPublicationStatus;
 use App\Enums\Project\ProjectStatus;
 use App\Models\Game\ContentType\GameContentType;
 use App\Models\Game\Filter\DimensionValue;
+use App\Policies\ProjectPolicy;
+use Illuminate\Database\Eloquent\Attributes\UsePolicy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -16,6 +18,7 @@ use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\MediaLibrary\MediaCollections\File;
 
+#[UsePolicy(ProjectPolicy::class)]
 class Project extends Model implements HasMedia
 {
     use HasSlug, InteractsWithMedia;

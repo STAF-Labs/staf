@@ -49,8 +49,10 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('/licences', [LicenceController::class, 'index']);
     Route::get('/projects', [ProjectController::class, 'index']);
     Route::post('/projects', [ProjectController::class, 'store']);
+    Route::get('/projects/{project}/release-filters', [ProjectController::class, 'releaseFilters']);
     Route::get('/projects/{project}', [ProjectController::class, 'show']);
     Route::patch('/projects/{project}', [ProjectController::class, 'update']);
+    Route::delete('/projects/{project}', [ProjectController::class, 'destroy']);
 
     Route::get('/organizations', [OrganizationController::class, 'index']);
     Route::get('/organizations/{organization}', [OrganizationController::class, 'show']);

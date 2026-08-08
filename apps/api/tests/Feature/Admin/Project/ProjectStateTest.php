@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Admin\Project;
 
+use App\Enums\CommonStatus;
 use App\Enums\Project\ProjectPublicationStatus;
 use App\Enums\Project\ProjectStatus;
 use App\Models\Game\ContentType\ContentType;
@@ -153,6 +154,7 @@ class ProjectStateTest extends TestCase
             'username' => 'admin',
             'email' => 'admin@example.com',
             'password' => 'password',
+            'status' => CommonStatus::ACTIVE,
         ]);
         $game = Game::query()->create([
             'name' => 'State Game',

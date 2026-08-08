@@ -45,6 +45,7 @@ export type ProjectListItem = {
   ownerable_type: string
   ownerable_id: number
   owner_name: string | null
+  can_delete: boolean
   game_content_type_id: number
   title: string
   slug: string
@@ -67,6 +68,7 @@ export type ProjectListItem = {
   game_name: string | null
   content_type_name: string | null
   released_at: string | null
+  releases_count: number
   created_at: string | null
   updated_at: string | null
 }
@@ -94,6 +96,7 @@ export type GameContentTypeListItem = {
 }
 
 export type ProjectOwnerOption = {
+  kind: 'user' | 'organization'
   type: string
   id: number
   label: string

@@ -2,14 +2,10 @@
 
 namespace App\Http\Requests\Admin\Project;
 
-use App\Enums\MembershipStatus;
 use App\Enums\Project\ProjectPublicationStatus;
 use App\Enums\Project\ProjectStatus;
 use App\Models\Game\Filter\Dimension;
 use App\Models\Game\Project\Project;
-use App\Models\Org\Organization;
-use App\Models\Org\OrganizationMember;
-use App\Models\User\User;
 use App\Services\Admin\Licence\SpdxLicenceCatalog;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -26,20 +22,7 @@ class UpdateProjectRequest extends FormRequest
             return false;
         }
 
-        if ($user->hasRole('admin')) {
-            return true;
-        }
-
-        if ($project->ownerable_type === User::class) {
-            return $project->ownerable_id === $user->id;
-        }
-
-        return $project->ownerable_type === Organization::class
-            && OrganizationMember::query()
-                ->where('organization_id', $project->ownerable_id)
-                ->where('user_id', $user->id)
-                ->where('status', MembershipStatus::ACTIVE)
-                ->exists();
+        return $user->can('update', $project);
     }
 
     /**
@@ -48,8 +31,8 @@ class UpdateProjectRequest extends FormRequest
     public function rules(SpdxLicenceCatalog $licenceCatalog): array
     {
         return [
-            'ownerable_type' => ['required_with:ownerable_id', 'string', Rule::in([User::class, Organization::class])],
-            'ownerable_id' => ['required_with:ownerable_type', 'integer'],
+            'ownerable_type' => ['prohibited'],
+            'ownerable_id' => ['prohibited'],
             'game_content_type_id' => ['sometimes', 'integer', Rule::exists('game_content_types', 'id')],
             'title' => ['sometimes', 'string', 'max:128'],
             'slug' => ['sometimes', 'nullable', 'string', 'max:128', Rule::unique('projects', 'slug')->ignore($this->route('project'))],
@@ -96,38 +79,6 @@ class UpdateProjectRequest extends FormRequest
     public function after(): array
     {
         return [
-            function (Validator $validator): void {
-                $ownerableType = $this->string('ownerable_type')->toString();
-                $ownerableId = $this->integer('ownerable_id');
-
-                if (! $this->hasAny(['ownerable_type', 'ownerable_id'])) {
-                    return;
-                }
-
-                if (! in_array($ownerableType, [User::class, Organization::class], true)) {
-                    return;
-                }
-
-                if ($ownerableType === User::class && $ownerableId !== $this->user()?->id) {
-                    $validator->errors()->add('ownerable_id', 'Можно выбрать только текущего пользователя.');
-
-                    return;
-                }
-
-                if ($ownerableType === Organization::class && ! OrganizationMember::query()
-                    ->where('organization_id', $ownerableId)
-                    ->where('user_id', $this->user()?->id)
-                    ->where('status', MembershipStatus::ACTIVE)
-                    ->exists()) {
-                    $validator->errors()->add('ownerable_id', 'Организация не найдена среди доступных владельцев.');
-
-                    return;
-                }
-
-                if (! $ownerableType::query()->whereKey($ownerableId)->exists()) {
-                    $validator->errors()->add('ownerable_id', 'Владелец не найден.');
-                }
-            },
             function (Validator $validator): void {
                 $this->validateProjectDimensionValues($validator);
             },

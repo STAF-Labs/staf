@@ -2,10 +2,8 @@
 
 namespace App\Http\Requests\Admin\Project;
 
-use App\Enums\MembershipStatus;
 use App\Models\Game\Filter\Dimension;
 use App\Models\Org\Organization;
-use App\Models\Org\OrganizationMember;
 use App\Models\User\User;
 use App\Services\Admin\Licence\SpdxLicenceCatalog;
 use Illuminate\Foundation\Http\FormRequest;
@@ -38,7 +36,7 @@ class StoreProjectRequest extends FormRequest
 
     public function authorize(): bool
     {
-        return true;
+        return $this->user() !== null;
     }
 
     /**
@@ -98,22 +96,6 @@ class StoreProjectRequest extends FormRequest
                 $ownerableId = $this->integer('ownerable_id');
 
                 if (! in_array($ownerableType, [User::class, Organization::class], true)) {
-                    return;
-                }
-
-                if ($ownerableType === User::class && $ownerableId !== $this->user()?->id) {
-                    $validator->errors()->add('ownerable_id', 'Можно выбрать только текущего пользователя.');
-
-                    return;
-                }
-
-                if ($ownerableType === Organization::class && ! OrganizationMember::query()
-                    ->where('organization_id', $ownerableId)
-                    ->where('user_id', $this->user()?->id)
-                    ->where('status', MembershipStatus::ACTIVE)
-                    ->exists()) {
-                    $validator->errors()->add('ownerable_id', 'Организация не найдена среди доступных владельцев.');
-
                     return;
                 }
 

@@ -31,6 +31,7 @@ class ProjectResource extends JsonResource
                 $this->ownerable instanceof Organization => $this->ownerable->name,
                 default => null,
             }),
+            'can_delete' => $request->user()?->can('delete', $this->resource) ?? false,
             'game_content_type_id' => $this->game_content_type_id,
             'title' => $this->title,
             'slug' => $this->slug,
@@ -58,6 +59,7 @@ class ProjectResource extends JsonResource
             'game_name' => $game?->name,
             'content_type_name' => $this->gameContentType?->contentType?->name,
             'released_at' => $this->releases_max_released_at,
+            'releases_count' => $this->releases_count ?? 0,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];
