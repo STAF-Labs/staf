@@ -2,9 +2,15 @@
 import { computed, onMounted, ref } from 'vue'
 import { Pencil, Plus, RotateCcw, SlidersHorizontal, Trash2 } from '@lucide/vue'
 import AppShell from '@/components/layout/AppShell.vue'
+import DeleteModal from '@/components/ui/DeleteModal.vue'
 import SearchField from '@/components/ui/SearchField.vue'
 import { fetchGames, type GameListItem } from '@/shared/games/games'
-import { fetchProjects, type ProjectListItem, type ProjectStatus } from '@/shared/projects/projects'
+import {
+  deleteProject as removeProject,
+  fetchProjects,
+  type ProjectListItem,
+  type ProjectStatus,
+} from '@/shared/projects/projects'
 
 type StatusFilter = ProjectStatus | 'all'
 type SortOption = 'title_asc' | 'title_desc' | 'released_at'
@@ -35,6 +41,8 @@ const pageSize = ref(20)
 const advancedFiltersOpen = ref(false)
 const message = ref('')
 const isLoading = ref(false)
+const deletingProjectId = ref<number | null>(null)
+const pendingDeleteProject = ref<ProjectListItem | null>(null)
 
 const gameFilterOptions = computed(() => {
   return [
@@ -84,6 +92,11 @@ const subtitle = computed(() => {
   }
 
   return `Всего проектов: ${projects.value.length}.`
+})
+const deleteModalDescription = computed(() => {
+  const title = pendingDeleteProject.value?.title ?? 'проект'
+
+  return `Проект «${title}», его релизы и файлы будут удалены без возможности восстановления.`
 })
 
 function matchesSearch(project: ProjectListItem): boolean {
@@ -216,6 +229,39 @@ async function loadProjects(): Promise<void> {
     message.value = 'Не удалось загрузить проекты.'
   } finally {
     isLoading.value = false
+  }
+}
+
+function openDeleteModal(project: ProjectListItem): void {
+  pendingDeleteProject.value = project
+}
+
+function closeDeleteModal(): void {
+  if (deletingProjectId.value !== null) {
+    return
+  }
+
+  pendingDeleteProject.value = null
+}
+
+async function confirmDelete(): Promise<void> {
+  if (!pendingDeleteProject.value) {
+    return
+  }
+
+  const project = pendingDeleteProject.value
+
+  deletingProjectId.value = project.id
+  message.value = ''
+
+  try {
+    await removeProject(project.id)
+    projects.value = projects.value.filter(({ id }) => id !== project.id)
+  } catch {
+    message.value = 'Не удалось удалить проект.'
+  } finally {
+    deletingProjectId.value = null
+    pendingDeleteProject.value = null
   }
 }
 
@@ -377,22 +423,24 @@ onMounted(() => {
                 {{ project.status_label ?? project.status ?? 'Статус не указан' }}
               </span>
 
-              <button
-                class="project-card__action"
-                type="button"
-                disabled
+              <RouterLink
+                class="icon-action"
+                :to="`/projects/${project.id}/edit`"
                 aria-label="Редактировать проект"
-                title="Редактирование пока недоступно"
+                title="Редактировать проект"
+                @click.stop
               >
                 <Pencil :size="16" :stroke-width="2" aria-hidden="true" />
-              </button>
+              </RouterLink>
 
               <button
-                class="project-card__action project-card__action--danger"
+                v-if="project.can_delete"
+                class="icon-action icon-action--danger"
                 type="button"
-                disabled
+                :disabled="deletingProjectId !== null"
                 aria-label="Удалить проект"
-                title="Удаление пока недоступно"
+                title="Удалить проект"
+                @click.stop.prevent="openDeleteModal(project)"
               >
                 <Trash2 :size="16" :stroke-width="2" aria-hidden="true" />
               </button>
@@ -426,6 +474,15 @@ onMounted(() => {
         </aside>
       </div>
     </section>
+
+    <DeleteModal
+      :open="pendingDeleteProject !== null"
+      title="Удалить проект"
+      :description="deleteModalDescription"
+      :loading="deletingProjectId !== null"
+      @cancel="closeDeleteModal"
+      @confirm="confirmDelete"
+    />
   </AppShell>
 </template>
 
@@ -476,8 +533,7 @@ onMounted(() => {
   align-items: center;
 }
 
-.project-card__status,
-.project-card__action {
+.project-card__status {
   min-height: 34px;
   color: var(--color-primary-text);
   background: color-mix(in srgb, var(--color-surface) 72%, transparent);
@@ -510,23 +566,6 @@ onMounted(() => {
 }
 
 .project-card__status--danger {
-  color: var(--color-danger);
-  border-color: color-mix(in srgb, var(--color-danger) 42%, transparent);
-}
-
-.project-card__action {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  padding: 0;
-  border-radius: var(--radius-sm);
-}
-
-.project-card__action:disabled {
-  cursor: not-allowed;
-}
-
-.project-card__action--danger {
   color: var(--color-danger);
   border-color: color-mix(in srgb, var(--color-danger) 42%, transparent);
 }

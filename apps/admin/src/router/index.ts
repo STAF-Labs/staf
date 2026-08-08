@@ -18,8 +18,8 @@ import OrganizationView from '@/views/orgs/OrganizationView.vue'
 import ProjectCreateDetailsView from '@/views/projects/ProjectCreateDetailsView.vue'
 import ProjectCreateNextView from '@/views/projects/ProjectCreateNextView.vue'
 import ProjectGameSelectView from '@/views/projects/ProjectGameSelectView.vue'
-import ProjectFormView from '@/views/projects/ProjectFormView.vue'
 import ProjectPreviewView from '@/views/projects/ProjectPreviewView.vue'
+import ProjectFormView from '@/views/projects/ProjectFormView.vue'
 import ProjectsView from '@/views/projects/ProjectsView.vue'
 import UserView from '@/views/users/UserView.vue'
 
@@ -301,9 +301,7 @@ const router = createRouter({
       name: 'projects.edit',
       component: ProjectFormView,
       meta: {
-        breadcrumb: {
-          parentName: 'projects.index',
-        },
+        breadcrumb: { parentName: 'projects.index' },
         requiresAuth: true,
         title: 'Редактирование проекта',
       },

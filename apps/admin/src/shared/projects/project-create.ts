@@ -11,6 +11,9 @@ export const projectCreateSteps = [
 
 export type ProjectCreateDraft = {
   projectId: number | null
+  ownerableType: string
+  ownerableId: number | null
+  ownerName: string
   gameId: string
   gameContentTypeId: number | null
   title: string
@@ -31,6 +34,9 @@ export type ProjectCreateDraft = {
 
 export const projectCreateDraft = reactive<ProjectCreateDraft>({
   projectId: null,
+  ownerableType: '',
+  ownerableId: null,
+  ownerName: '',
   gameId: '',
   gameContentTypeId: null,
   title: '',
@@ -56,6 +62,9 @@ export function selectProjectGame(gameId: string): void {
 
   Object.assign(projectCreateDraft, {
     projectId: null,
+    ownerableType: '',
+    ownerableId: null,
+    ownerName: '',
     gameId,
     gameContentTypeId: null,
     title: '',
@@ -78,6 +87,9 @@ export function selectProjectGame(gameId: string): void {
 export function resetProjectCreateDraft(): void {
   Object.assign(projectCreateDraft, {
     projectId: null,
+    ownerableType: '',
+    ownerableId: null,
+    ownerName: '',
     gameId: '',
     gameContentTypeId: null,
     title: '',
@@ -104,9 +116,7 @@ export function projectDescriptionIsComplete(gameId: string): boolean {
 export function calculateProjectPercentageComplete(): number {
   const checklist = projectCompletionChecklist()
 
-  return Math.round(
-    (checklist.filter((item) => item.complete).length / checklist.length) * 100,
-  )
+  return Math.round((checklist.filter((item) => item.complete).length / checklist.length) * 100)
 }
 
 export type ProjectCompletionItem = {
@@ -163,6 +173,9 @@ export async function hydrateProjectCreateDraft(projectId: number): Promise<void
 
   Object.assign(projectCreateDraft, {
     projectId: project.id,
+    ownerableType: project.ownerable_type,
+    ownerableId: project.ownerable_id,
+    ownerName: project.owner_name ?? '',
     gameId: project.game_id === null ? '' : String(project.game_id),
     gameContentTypeId: project.game_content_type_id,
     title: project.title,

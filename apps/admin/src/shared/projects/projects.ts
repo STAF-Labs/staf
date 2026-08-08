@@ -1,4 +1,5 @@
 import { http } from '@/shared/api/http'
+import type { GameDimension } from '@/shared/games/games'
 import type {
   CreateProjectPayload,
   HttpsUrl,
@@ -30,6 +31,14 @@ export async function fetchProjects(): Promise<ListResponse<ProjectListItem>> {
 
 export async function fetchProject(id: number | string): Promise<ProjectDetail> {
   const response = await http.get<ProjectDetail>(`/api/projects/${id}`)
+
+  return response.data
+}
+
+export async function fetchProjectReleaseFilters(
+  id: number | string,
+): Promise<ListResponse<GameDimension>> {
+  const response = await http.get<ListResponse<GameDimension>>(`/api/projects/${id}/release-filters`)
 
   return response.data
 }
@@ -129,12 +138,18 @@ export async function updateProject(
   id: number | string,
   payload: CreateProjectPayload,
 ): Promise<ProjectDetail> {
-  const response = await http.patch<ProjectDetail>(
-    `/api/projects/${id}`,
-    makeProjectPayload(payload),
-  )
+  const requestPayload = makeProjectPayload(payload)
+
+  delete requestPayload.ownerable_type
+  delete requestPayload.ownerable_id
+
+  const response = await http.patch<ProjectDetail>(`/api/projects/${id}`, requestPayload)
 
   return response.data
+}
+
+export async function deleteProject(id: number | string): Promise<void> {
+  await http.delete(`/api/projects/${id}`)
 }
 
 function makeProjectPayload(payload: CreateProjectPayload): Record<string, unknown> {
