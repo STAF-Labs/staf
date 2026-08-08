@@ -378,7 +378,7 @@ void loadGame()
           </span>
           <div v-if="bannerPreviewUrl || currentBannerUrl" class="game-upload__actions">
             <button
-              class="game-upload__action"
+              class="game-upload__action icon-action"
               type="button"
               aria-label="Заменить баннер"
               title="Заменить баннер"
@@ -389,7 +389,7 @@ void loadGame()
 
             <button
               v-if="form.banner || currentBannerUrl"
-              class="game-upload__action game-upload__action--danger"
+              class="game-upload__action icon-action icon-action--danger"
               type="button"
               aria-label="Удалить баннер"
               title="Удалить баннер"
@@ -432,7 +432,7 @@ void loadGame()
               </span>
               <div v-if="logoPreviewUrl || currentLogoUrl" class="game-upload__actions">
                 <button
-                  class="game-upload__action"
+                  class="game-upload__action icon-action"
                   type="button"
                   aria-label="Заменить логотип"
                   title="Заменить логотип"
@@ -443,7 +443,7 @@ void loadGame()
 
                 <button
                   v-if="form.logo || currentLogoUrl"
-                  class="game-upload__action game-upload__action--danger"
+                  class="game-upload__action icon-action icon-action--danger"
                   type="button"
                   aria-label="Удалить логотип"
                   title="Удалить логотип"

@@ -307,7 +307,7 @@ onMounted(() => {
 
             <div class="game-card__actions" aria-label="Действия игры">
               <RouterLink
-                class="game-card__action"
+                class="icon-action"
                 :to="{ name: 'games.edit', params: { id: String(game.id) } }"
                 aria-label="Редактировать игру"
                 title="Редактировать игру"
@@ -316,7 +316,7 @@ onMounted(() => {
               </RouterLink>
 
               <button
-                class="game-card__action game-card__action--danger"
+                class="icon-action icon-action--danger"
                 type="button"
                 :disabled="actionGameId === game.id"
                 aria-label="Удалить игру"

@@ -314,7 +314,7 @@ game_version,v1_21,1.21,,10,true</code></pre>
 
           <div v-if="selectedFile" class="content-type-import-upload__actions">
             <button
-              class="content-type-import-upload__action"
+              class="content-type-import-upload__action icon-action"
               type="button"
               aria-label="Заменить файл"
               title="Заменить файл"
@@ -324,7 +324,7 @@ game_version,v1_21,1.21,,10,true</code></pre>
             </button>
 
             <button
-              class="content-type-import-upload__action content-type-import-upload__action--danger"
+              class="content-type-import-upload__action icon-action icon-action--danger"
               type="button"
               aria-label="Удалить файл"
               title="Удалить файл"
@@ -527,23 +527,6 @@ game_version,v1_21,1.21,,10,true</code></pre>
   gap: 8px;
 }
 
-.content-type-import-upload__action {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  color: var(--color-text);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-soft);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-
-.content-type-import-upload__action:hover {
-  background: var(--color-surface-hover);
-}
-
-.content-type-import-upload__action--danger,
 .content-type-import-help--error {
   color: var(--color-danger);
 }

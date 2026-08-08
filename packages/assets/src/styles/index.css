@@ -2,9 +2,11 @@
 @import './themes/theme.css';
 @import './foundations/base.css';
 @import './components/button.css';
+@import './components/icon-action.css';
 @import './components/form.css';
 @import './components/editor.css';
 @import './components/data-list.css';
 @import './components/modal.css';
 @import './components/game-card.css';
 @import './components/project-form.css';
+@import './components/project-tabs.css';

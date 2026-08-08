@@ -2,6 +2,39 @@
   align-items: start;
 }
 
+.project-edit-header {
+  display: grid;
+  gap: 14px;
+}
+
+.project-edit-header__heading h1 {
+  margin: 0;
+  font-size: clamp(28px, 4vw, 40px);
+  letter-spacing: -0.03em;
+}
+
+.project-edit-header__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 8px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.project-edit-header__status {
+  padding: 5px 9px;
+  color: var(--color-success);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.project-edit-empty {
+  min-height: 180px;
+}
+
 .project-form-header__back {
   display: inline-flex;
   align-items: center;
@@ -17,6 +50,14 @@
   border: 1px solid var(--color-border-soft);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
+}
+
+.project-edit-page .project-form-panel {
+  max-width: 855px;
+}
+
+.project-edit-page .project-form-actions .button-primary {
+  width: 100%;
 }
 
 .project-form-grid {

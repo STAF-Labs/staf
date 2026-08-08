@@ -122,31 +122,6 @@
   gap: 8px;
 }
 
-.game-upload__action {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  color: var(--color-primary-text);
-  background: color-mix(in srgb, var(--color-primary) 70%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-primary) 72%, transparent);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.game-upload__action:hover {
-  background: var(--color-primary);
-}
-
-.game-upload__action--danger {
-  background: color-mix(in srgb, var(--color-danger) 70%, transparent);
-  border-color: color-mix(in srgb, var(--color-danger) 72%, transparent);
-}
-
-.game-upload__action--danger:hover {
-  background: var(--color-danger);
-}
-
 .game-form-help {
   margin: 0;
   color: var(--color-text-muted);

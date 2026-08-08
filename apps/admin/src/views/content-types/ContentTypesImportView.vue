@@ -214,7 +214,7 @@ function fileValidationMessage(error: unknown): string {
 
           <div v-if="selectedFile" class="content-type-import-upload__actions">
             <button
-              class="content-type-import-upload__action"
+              class="content-type-import-upload__action icon-action"
               type="button"
               aria-label="Заменить файл"
               title="Заменить файл"
@@ -224,7 +224,7 @@ function fileValidationMessage(error: unknown): string {
             </button>
 
             <button
-              class="content-type-import-upload__action content-type-import-upload__action--danger"
+              class="content-type-import-upload__action icon-action icon-action--danger"
               type="button"
               aria-label="Удалить файл"
               title="Удалить файл"
@@ -441,26 +441,6 @@ function fileValidationMessage(error: unknown): string {
   z-index: 2;
   display: flex;
   gap: 8px;
-}
-
-.content-type-import-upload__action {
-  display: grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  color: var(--color-text);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-soft);
-  border-radius: var(--radius-md);
-  cursor: pointer;
-}
-
-.content-type-import-upload__action:hover {
-  background: var(--color-surface-hover);
-}
-
-.content-type-import-upload__action--danger {
-  color: var(--color-danger);
 }
 
 .content-type-import-help {
