@@ -5,22 +5,29 @@ namespace App\Http\Controllers\Api\Admin\Project;
 use App\Enums\CommonStatus;
 use App\Enums\MembershipStatus;
 use App\Enums\Org\OrgMemberRole;
+use App\Enums\Project\ProjectMemberRole;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\Project\ReorderProjectScreenshotsRequest;
+use App\Http\Requests\Admin\Project\StoreProjectMemberRequest;
 use App\Http\Requests\Admin\Project\StoreProjectRequest;
 use App\Http\Requests\Admin\Project\UpdateProjectRequest;
 use App\Http\Resources\Game\Filter\DimensionResource;
+use App\Http\Resources\Game\Project\ProjectMemberResource;
 use App\Http\Resources\Game\Project\ProjectResource;
 use App\Models\Game\ContentType\GameContentType;
 use App\Models\Game\Project\Project;
+use App\Models\Game\Project\ProjectMember;
 use App\Models\Org\Organization;
 use App\Models\Org\OrganizationMember;
 use App\Models\User\User;
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Gate;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 class ProjectController extends Controller
 {
@@ -145,6 +152,81 @@ class ProjectController extends Controller
         ]);
     }
 
+    public function members(Request $request, Project $project): JsonResponse
+    {
+        Gate::forUser($request->user())->authorize('update', $project);
+
+        $members = $project->members()
+            ->with('user.userProfile.media')
+            ->latest('id')
+            ->get();
+
+        return response()->json([
+            'data' => ProjectMemberResource::collection($members)->resolve($request),
+            'total' => $members->count(),
+            'filtered_total' => $members->count(),
+        ]);
+    }
+
+    public function memberCandidates(Request $request, Project $project): JsonResponse
+    {
+        Gate::forUser($request->user())->authorize('update', $project);
+
+        $validated = $request->validate([
+            'search' => ['nullable', 'string'],
+        ]);
+        $search = trim((string) ($validated['search'] ?? ''));
+        $excludedUserIds = $project->members()->pluck('user_id');
+
+        if ($project->ownerable_type === User::class) {
+            $excludedUserIds->push((int) $project->ownerable_id);
+        }
+
+        $query = User::query()
+            ->with('userProfile.media')
+            ->where('status', CommonStatus::ACTIVE)
+            ->whereNotIn('id', $excludedUserIds->unique()->values())
+            ->when($search !== '', function (Builder $query) use ($search): void {
+                $query->where(function (Builder $query) use ($search): void {
+                    $query
+                        ->where('username', 'like', "%{$search}%")
+                        ->orWhereHas('userProfile', function (Builder $query) use ($search): void {
+                            $query->where('display_name', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->orderBy('username')
+            ->limit(8)
+            ->get();
+
+        return response()->json([
+            'data' => $query->map(fn (User $user): array => [
+                'id' => $user->id,
+                'username' => $user->username,
+                'display_name' => $user->userProfile?->display_name,
+                'avatar_url' => $user->userProfile?->getFirstMediaUrl('avatar') ?: null,
+            ])->values(),
+            'total' => $query->count(),
+            'filtered_total' => $query->count(),
+        ]);
+    }
+
+    public function storeMember(StoreProjectMemberRequest $request, Project $project): JsonResponse
+    {
+        $member = $project->members()->create([
+            'user_id' => $request->integer('user_id'),
+            'role' => ProjectMemberRole::MEMBER->value,
+            'status' => MembershipStatus::INVITED->value,
+        ]);
+
+        return response()->json(
+            ProjectMemberResource::make(
+                $member->load('user.userProfile.media')
+            )->resolve($request),
+            201
+        );
+    }
+
     public function store(StoreProjectRequest $request): JsonResponse
     {
         $validated = $request->validated();
@@ -210,6 +292,61 @@ class ProjectController extends Controller
         return response()->json(
             ProjectResource::make(
                 $project->load(
+                    'ownerable',
+                    'gameContentType.game',
+                    'gameContentType.contentType',
+                    'media',
+                    'dimensionValues'
+                )
+                    ->loadMorph('ownerable', [
+                        User::class => ['userProfile'],
+                    ])
+                    ->loadCount('releases')
+                    ->loadMax('releases', 'released_at')
+            )->resolve($request)
+        );
+    }
+
+    public function reorderScreenshots(
+        ReorderProjectScreenshotsRequest $request,
+        Project $project
+    ): JsonResponse {
+        Media::setNewOrder($request->validated()['media_ids']);
+
+        return response()->json(
+            ProjectResource::make(
+                $project->refresh()->load(
+                    'ownerable',
+                    'gameContentType.game',
+                    'gameContentType.contentType',
+                    'media',
+                    'dimensionValues'
+                )
+                    ->loadMorph('ownerable', [
+                        User::class => ['userProfile'],
+                    ])
+                    ->loadCount('releases')
+                    ->loadMax('releases', 'released_at')
+            )->resolve($request)
+        );
+    }
+
+    public function destroyScreenshot(Request $request, Project $project, Media $media): JsonResponse
+    {
+        Gate::forUser($request->user())->authorize('update', $project);
+
+        abort_if(
+            $media->model_type !== $project->getMorphClass()
+            || (int) $media->model_id !== $project->id
+            || $media->collection_name !== 'screenshots',
+            404
+        );
+
+        $media->delete();
+
+        return response()->json(
+            ProjectResource::make(
+                $project->refresh()->load(
                     'ownerable',
                     'gameContentType.game',
                     'gameContentType.contentType',

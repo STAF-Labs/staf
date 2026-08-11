@@ -9,8 +9,8 @@ enum ProjectReleaseStatus: string
 {
     use EnumOptions;
 
-    case DRAFT = 'draft';
     case PUBLISHED = 'published';
+    case ON_MODERATION = 'on_moderation';
     case ARCHIVED = 'archived';
 
     public function getLabel(): string|Htmlable|null
@@ -21,8 +21,8 @@ enum ProjectReleaseStatus: string
     public function getColor(): string|array|null
     {
         return match ($this) {
-            self::DRAFT => 'gray',
             self::PUBLISHED => 'success',
+            self::ON_MODERATION => 'warning',
             self::ARCHIVED => 'info',
         };
     }

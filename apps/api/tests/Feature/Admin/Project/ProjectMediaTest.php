@@ -3,11 +3,16 @@
 namespace Tests\Feature\Admin\Project;
 
 use App\Enums\CommonStatus;
+use App\Enums\MembershipStatus;
+use App\Enums\Project\ProjectMemberRole;
+use App\Enums\Project\ProjectReleaseStatus;
 use App\Models\Game\ContentType\ContentType;
 use App\Models\Game\ContentType\GameContentType;
 use App\Models\Game\Filter\Dimension;
 use App\Models\Game\Game;
 use App\Models\Game\Project\Project;
+use App\Models\Game\Project\ProjectMember;
+use App\Models\Game\Project\ProjectRelease;
 use App\Models\User\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -40,9 +45,13 @@ class ProjectMediaTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('title', 'Media Project')
             ->assertJsonPath('licence_name', 'MIT')
+            ->assertJsonCount(2, 'screenshots')
             ->assertJsonCount(2, 'screenshot_urls')
             ->assertJson(fn ($json) => $json
                 ->whereType('logo_url', 'string')
+                ->whereType('screenshots.0.id', 'integer')
+                ->whereType('screenshots.0.url', 'string')
+                ->whereType('screenshots.0.order', 'integer')
                 ->whereType('screenshot_urls.0', 'string')
                 ->whereType('screenshot_urls.1', 'string')
                 ->etc());
@@ -63,6 +72,187 @@ class ProjectMediaTest extends TestCase
             ->postJson('/api/projects', $this->projectPayload($user, $gameContentType))
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['logo']);
+    }
+
+    public function test_admin_can_create_project_release_with_file_and_release_filters(): void
+    {
+        Storage::fake('public');
+
+        [$user, $gameContentType] = $this->projectContext();
+        $project = Project::query()->create($this->projectPayload($user, $gameContentType));
+        $dimension = Dimension::query()->create([
+            'game_content_type_id' => $gameContentType->id,
+            'name' => 'Версия игры',
+            'selection_mode' => 'single',
+            'applies_to' => 'release',
+            'is_filterable' => true,
+            'is_required' => true,
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
+        $value = $dimension->values()->create([
+            'name' => '1.20',
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->postJson("/api/projects/{$project->id}/releases", [
+                'file' => UploadedFile::fake()->create('release.zip', 10, 'application/zip'),
+                'title' => '1.0.0',
+                'type' => 'beta',
+                'changelog' => [
+                    'type' => 'doc',
+                    'content' => [],
+                ],
+                'dimension_value_ids' => [$value->id],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('title', '1.0.0')
+            ->assertJsonPath('type', 'beta')
+            ->assertJsonPath('status', 'on_moderation')
+            ->assertJsonPath('released_at', today()->toDateString())
+            ->assertJsonPath('dimension_value_ids.0', $value->id)
+            ->assertJson(fn ($json) => $json
+                ->whereType('file_url', 'string')
+                ->where('file_name', 'release.zip')
+                ->etc());
+
+        $release = ProjectRelease::query()->firstOrFail();
+
+        $this->assertSame(ProjectReleaseStatus::ON_MODERATION, $release->status);
+        $this->assertCount(1, $release->getMedia('release'));
+        $this->assertDatabaseHas('project_release_dimension_values', [
+            'project_release_id' => $release->id,
+            'dimension_value_id' => $value->id,
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->getJson("/api/projects/{$project->id}/releases")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.title', '1.0.0')
+            ->assertJsonPath('data.0.dimension_value_ids.0', $value->id);
+    }
+
+    public function test_admin_can_search_active_users_and_invite_project_member(): void
+    {
+        [$user, $gameContentType] = $this->projectContext();
+        $project = Project::query()->create($this->projectPayload($user, $gameContentType));
+        $candidate = User::query()->create([
+            'username' => 'candidate',
+            'email' => 'candidate@example.com',
+            'password' => 'password',
+            'status' => CommonStatus::ACTIVE,
+        ]);
+        $candidate->userProfile()->create([
+            'display_name' => 'Project Candidate',
+        ]);
+        $blocked = User::query()->create([
+            'username' => 'blocked-candidate',
+            'email' => 'blocked-candidate@example.com',
+            'password' => 'password',
+            'status' => CommonStatus::BLOCKED,
+        ]);
+        $blocked->userProfile()->create([
+            'display_name' => 'Blocked Candidate',
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->getJson("/api/projects/{$project->id}/member-candidates?search=Candidate")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $candidate->id)
+            ->assertJsonPath('data.0.display_name', 'Project Candidate');
+
+        $this
+            ->actingAs($user)
+            ->postJson("/api/projects/{$project->id}/members", [
+                'user_id' => $candidate->id,
+            ])
+            ->assertCreated()
+            ->assertJsonPath('user_id', $candidate->id)
+            ->assertJsonPath('role', 'member')
+            ->assertJsonPath('status', 'invited')
+            ->assertJsonPath('display_name', 'Project Candidate');
+
+        $member = ProjectMember::query()->firstOrFail();
+
+        $this->assertSame(ProjectMemberRole::MEMBER, $member->role);
+        $this->assertSame(MembershipStatus::INVITED, $member->status);
+
+        $this
+            ->actingAs($user)
+            ->getJson("/api/projects/{$project->id}/members")
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.user_id', $candidate->id);
+
+        $this
+            ->actingAs($user)
+            ->postJson("/api/projects/{$project->id}/members", [
+                'user_id' => $candidate->id,
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['user_id']);
+    }
+
+    public function test_admin_can_delete_project_release(): void
+    {
+        [$user, $gameContentType] = $this->projectContext();
+        $project = Project::query()->create($this->projectPayload($user, $gameContentType));
+        $release = ProjectRelease::query()->create([
+            'project_id' => $project->id,
+            'title' => '1.0.0',
+            'slug' => '1-0-0',
+            'type' => 'release',
+            'status' => 'on_moderation',
+            'changelog' => [
+                'type' => 'doc',
+                'content' => [],
+            ],
+            'released_at' => today(),
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->deleteJson("/api/projects/{$project->id}/releases/{$release->id}")
+            ->assertOk()
+            ->assertJsonPath('message', 'Релиз удален.');
+
+        $this->assertModelMissing($release);
+    }
+
+    public function test_project_release_delete_rejects_foreign_release(): void
+    {
+        [$user, $gameContentType] = $this->projectContext();
+        $project = Project::query()->create($this->projectPayload($user, $gameContentType));
+        $anotherProject = Project::query()->create([
+            ...$this->projectPayload($user, $gameContentType),
+            'title' => 'Another Media Project',
+        ]);
+        $foreignRelease = ProjectRelease::query()->create([
+            'project_id' => $anotherProject->id,
+            'title' => '1.0.0',
+            'slug' => '1-0-0',
+            'type' => 'release',
+            'status' => 'on_moderation',
+            'changelog' => [
+                'type' => 'doc',
+                'content' => [],
+            ],
+            'released_at' => today(),
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->deleteJson("/api/projects/{$project->id}/releases/{$foreignRelease->id}")
+            ->assertNotFound();
+
+        $this->assertModelExists($foreignRelease);
     }
 
     public function test_admin_can_update_project_licence_name(): void
@@ -210,6 +400,114 @@ class ProjectMediaTest extends TestCase
         $this->assertCount(1, $project->getMedia('logo'));
         $this->assertCount(2, $project->getMedia('screenshots'));
         $this->assertSame('new-logo', $project->getFirstMedia('logo')?->name);
+    }
+
+    public function test_admin_can_reorder_project_screenshots(): void
+    {
+        Storage::fake('public');
+
+        [$user, $gameContentType] = $this->projectContext();
+        $project = Project::query()->create($this->projectPayload($user, $gameContentType));
+        $firstScreenshot = $project->addMedia(UploadedFile::fake()->image('first.png', 1280, 720))
+            ->toMediaCollection('screenshots');
+        $secondScreenshot = $project->addMedia(UploadedFile::fake()->image('second.png', 1280, 720))
+            ->toMediaCollection('screenshots');
+        $thirdScreenshot = $project->addMedia(UploadedFile::fake()->image('third.png', 1280, 720))
+            ->toMediaCollection('screenshots');
+
+        $this
+            ->actingAs($user)
+            ->patchJson("/api/projects/{$project->id}/screenshots/order", [
+                'media_ids' => [$thirdScreenshot->id, $firstScreenshot->id, $secondScreenshot->id],
+            ])
+            ->assertOk()
+            ->assertJsonPath('screenshots.0.id', $thirdScreenshot->id)
+            ->assertJsonPath('screenshots.1.id', $firstScreenshot->id)
+            ->assertJsonPath('screenshots.2.id', $secondScreenshot->id);
+
+        $this->assertSame(
+            [$thirdScreenshot->id, $firstScreenshot->id, $secondScreenshot->id],
+            $project->refresh()->getMedia('screenshots')->pluck('id')->all()
+        );
+    }
+
+    public function test_screenshot_reorder_requires_exact_project_screenshot_ids(): void
+    {
+        Storage::fake('public');
+
+        [$user, $gameContentType] = $this->projectContext();
+        $project = Project::query()->create($this->projectPayload($user, $gameContentType));
+        $firstScreenshot = $project->addMedia(UploadedFile::fake()->image('first.png', 1280, 720))
+            ->toMediaCollection('screenshots');
+        $secondScreenshot = $project->addMedia(UploadedFile::fake()->image('second.png', 1280, 720))
+            ->toMediaCollection('screenshots');
+        $anotherProject = Project::query()->create([
+            ...$this->projectPayload($user, $gameContentType),
+            'title' => 'Another Media Project',
+        ]);
+        $foreignScreenshot = $anotherProject
+            ->addMedia(UploadedFile::fake()->image('foreign.png', 1280, 720))
+            ->toMediaCollection('screenshots');
+
+        $this
+            ->actingAs($user)
+            ->patchJson("/api/projects/{$project->id}/screenshots/order", [
+                'media_ids' => [$secondScreenshot->id, $foreignScreenshot->id],
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['media_ids']);
+
+        $this->assertSame(
+            [$firstScreenshot->id, $secondScreenshot->id],
+            $project->refresh()->getMedia('screenshots')->pluck('id')->all()
+        );
+    }
+
+    public function test_admin_can_delete_project_screenshot(): void
+    {
+        Storage::fake('public');
+
+        [$user, $gameContentType] = $this->projectContext();
+        $project = Project::query()->create($this->projectPayload($user, $gameContentType));
+        $firstScreenshot = $project->addMedia(UploadedFile::fake()->image('first.png', 1280, 720))
+            ->toMediaCollection('screenshots');
+        $secondScreenshot = $project->addMedia(UploadedFile::fake()->image('second.png', 1280, 720))
+            ->toMediaCollection('screenshots');
+
+        $this
+            ->actingAs($user)
+            ->deleteJson("/api/projects/{$project->id}/screenshots/{$firstScreenshot->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'screenshots')
+            ->assertJsonPath('screenshots.0.id', $secondScreenshot->id);
+
+        $this->assertDatabaseMissing('media', ['id' => $firstScreenshot->id]);
+        $this->assertSame(
+            [$secondScreenshot->id],
+            $project->refresh()->getMedia('screenshots')->pluck('id')->all()
+        );
+    }
+
+    public function test_project_screenshot_delete_rejects_foreign_media(): void
+    {
+        Storage::fake('public');
+
+        [$user, $gameContentType] = $this->projectContext();
+        $project = Project::query()->create($this->projectPayload($user, $gameContentType));
+        $anotherProject = Project::query()->create([
+            ...$this->projectPayload($user, $gameContentType),
+            'title' => 'Another Media Project',
+        ]);
+        $foreignScreenshot = $anotherProject
+            ->addMedia(UploadedFile::fake()->image('foreign.png', 1280, 720))
+            ->toMediaCollection('screenshots');
+
+        $this
+            ->actingAs($user)
+            ->deleteJson("/api/projects/{$project->id}/screenshots/{$foreignScreenshot->id}")
+            ->assertNotFound();
+
+        $this->assertDatabaseHas('media', ['id' => $foreignScreenshot->id]);
     }
 
     public function test_logo_can_be_replaced_during_partial_draft_update(): void

@@ -4,15 +4,18 @@ namespace App\Models\Game\Project;
 
 use App\Concerns\HasSlug;
 use App\Enums\Project\ProjectReleaseStatus;
+use App\Enums\Project\ProjectReleaseType;
 use App\Models\Game\Filter\DimensionValue;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\MediaLibrary\HasMedia;
+use Spatie\MediaLibrary\InteractsWithMedia;
 
-class ProjectRelease extends Model
+class ProjectRelease extends Model implements HasMedia
 {
-    use HasSlug;
+    use HasSlug, InteractsWithMedia;
 
     protected $table = 'project_releases';
 
@@ -20,9 +23,18 @@ class ProjectRelease extends Model
         'project_id',
         'title',
         'slug',
+        'type',
         'changelog',
         'released_at',
         'status',
+    ];
+
+    /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'status' => ProjectReleaseStatus::ON_MODERATION->value,
+        'type' => ProjectReleaseType::RELEASE->value,
     ];
 
     public function project(): BelongsTo
@@ -38,6 +50,7 @@ class ProjectRelease extends Model
         return [
             'changelog' => 'json:unicode',
             'released_at' => 'date',
+            'type' => ProjectReleaseType::class,
             'status' => ProjectReleaseStatus::class,
         ];
     }
@@ -53,6 +66,12 @@ class ProjectRelease extends Model
             DimensionValue::class,
             'project_release_dimension_values'
         )->withTimestamps();
+    }
+
+    public function registerMediaCollections(): void
+    {
+        $this->addMediaCollection('release')
+            ->singleFile();
     }
 
     protected function slugSourceAttribute(): string

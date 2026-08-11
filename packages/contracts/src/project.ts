@@ -2,6 +2,14 @@ export type ProjectStatus = 'draft' | 'on_moderation' | 'published' | 'rejected'
 
 export type ProjectPublicationStatus = 'public' | 'private' | 'url_only' | 'archived'
 
+export type ProjectReleaseType = 'alpha' | 'beta' | 'release'
+
+export type ProjectReleaseStatus = 'published' | 'on_moderation' | 'archived'
+
+export type ProjectMemberRole = 'owner' | 'maintainer' | 'member'
+
+export type ProjectMemberStatus = 'active' | 'invited' | 'suspended'
+
 export type ContentTypeListItem = {
   id: number
   name: string
@@ -54,6 +62,7 @@ export type ProjectListItem = {
   tags: unknown
   website_urls: unknown
   logo_url: string | null
+  screenshots: ProjectScreenshot[]
   screenshot_urls: string[]
   licence_name: string | null
   dimension_value_ids?: number[]
@@ -74,6 +83,56 @@ export type ProjectListItem = {
 }
 
 export type ProjectDetail = ProjectListItem
+
+export type ProjectScreenshot = {
+  id: number
+  url: string
+  order: number
+}
+
+export type ProjectRelease = {
+  id: number
+  project_id: number
+  title: string
+  slug: string
+  type: ProjectReleaseType
+  type_label: string | null
+  type_color: string | null
+  changelog: unknown
+  released_at: string | null
+  status: ProjectReleaseStatus
+  status_label: string | null
+  status_color: string | null
+  file_url: string | null
+  file_name: string | null
+  dimension_value_ids?: number[]
+  created_at: string | null
+  updated_at: string | null
+}
+
+export type ProjectMember = {
+  id: number
+  project_id: number
+  user_id: number
+  username: string | null
+  display_name: string | null
+  avatar_url: string | null
+  role: ProjectMemberRole
+  role_label: string | null
+  role_color: string | null
+  status: ProjectMemberStatus
+  status_label: string | null
+  status_color: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export type ProjectMemberCandidate = {
+  id: number
+  username: string
+  display_name: string | null
+  avatar_url: string | null
+}
 
 export type ProjectContentTypeOption = {
   id: number

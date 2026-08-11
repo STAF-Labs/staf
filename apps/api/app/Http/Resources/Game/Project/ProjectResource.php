@@ -40,6 +40,13 @@ class ProjectResource extends JsonResource
             'tags' => $this->tags,
             'website_urls' => $this->website_urls,
             'logo_url' => $this->getFirstMediaUrl('logo') ?: null,
+            'screenshots' => $this->getMedia('screenshots')
+                ->map(fn ($media): array => [
+                    'id' => $media->id,
+                    'url' => $media->getUrl(),
+                    'order' => $media->order_column,
+                ])
+                ->values(),
             'screenshot_urls' => $this->getMedia('screenshots')
                 ->map(fn ($media): string => $media->getUrl())
                 ->values(),
