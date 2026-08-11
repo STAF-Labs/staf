@@ -1,5 +1,5 @@
 import { reactive } from 'vue'
-import { fetchProject } from '@/shared/projects/projects'
+import { fetchProject, type ProjectDetail } from '@/shared/projects/projects'
 
 export const projectCreateSteps = [
   'Игра',
@@ -30,6 +30,12 @@ export type ProjectCreateDraft = {
   tagInput: string
   tags: string[]
   websiteUrls: string[]
+}
+
+export type ProjectCreateRouteTarget = {
+  name: string
+  params?: Record<string, string>
+  query?: Record<string, string>
 }
 
 export const projectCreateDraft = reactive<ProjectCreateDraft>({
@@ -171,6 +177,75 @@ export async function hydrateProjectCreateDraft(projectId: number): Promise<void
 
   const project = await fetchProject(projectId)
 
+  applyProjectToCreateDraft(project)
+}
+
+export async function projectCreateContinueTargetById(
+  projectId: number,
+): Promise<ProjectCreateRouteTarget> {
+  const project = await fetchProject(projectId)
+
+  if (project.status === 'draft') {
+    applyProjectToCreateDraft(project)
+  }
+
+  return projectCreateContinueTarget(project)
+}
+
+export function projectCreateContinueTarget(project: ProjectDetail): ProjectCreateRouteTarget {
+  if (project.status !== 'draft') {
+    return {
+      name: 'projects.show',
+      params: { id: String(project.id) },
+    }
+  }
+
+  if (project.game_id === null) {
+    return {
+      name: 'projects.create',
+    }
+  }
+
+  const gameId = String(project.game_id)
+  const query = { projectId: String(project.id) }
+
+  if (
+    !project.game_content_type_id ||
+    !project.title.trim() ||
+    !project.logo_url ||
+    !richTextIsFilled(project.summary)
+  ) {
+    return {
+      name: 'projects.create.details',
+      params: { gameId },
+      query,
+    }
+  }
+
+  if (!richTextIsFilled(project.description)) {
+    return {
+      name: 'projects.create.description',
+      params: { gameId },
+      query,
+    }
+  }
+
+  if (!project.licence_name) {
+    return {
+      name: 'projects.create.licence',
+      params: { gameId },
+      query,
+    }
+  }
+
+  return {
+    name: 'projects.create.continue',
+    params: { gameId },
+    query,
+  }
+}
+
+function applyProjectToCreateDraft(project: ProjectDetail): void {
   Object.assign(projectCreateDraft, {
     projectId: project.id,
     ownerableType: project.ownerable_type,

@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { authLoaded, currentUser, fetchCurrentUser } from '../shared/auth/session'
 import {
   projectBasicsAreComplete,
+  projectCreateContinueTargetById,
   projectDescriptionIsComplete,
 } from '@/shared/projects/project-create'
 import ContentTypesImportView from '@/views/content-types/ContentTypesImportView.vue'
@@ -20,6 +21,7 @@ import ProjectCreateNextView from '@/views/projects/ProjectCreateNextView.vue'
 import ProjectGameSelectView from '@/views/projects/ProjectGameSelectView.vue'
 import ProjectPreviewView from '@/views/projects/ProjectPreviewView.vue'
 import ProjectFormView from '@/views/projects/ProjectFormView.vue'
+import ProjectReleaseCreateView from '@/views/projects/ProjectReleaseCreateView.vue'
 import ProjectsView from '@/views/projects/ProjectsView.vue'
 import UserView from '@/views/users/UserView.vue'
 
@@ -196,6 +198,32 @@ const router = createRouter({
       },
     },
     {
+      path: '/projects/:id/continue',
+      name: 'projects.continue',
+      component: ProjectGameSelectView,
+      beforeEnter: async (to) => {
+        const projectId = Number(to.params.id)
+
+        if (!Number.isInteger(projectId) || projectId <= 0) {
+          return { name: 'projects.index' }
+        }
+
+        try {
+          return await projectCreateContinueTargetById(projectId)
+        } catch {
+          return { name: 'projects.index' }
+        }
+      },
+      meta: {
+        breadcrumb: {
+          label: 'Продолжение создания',
+          parentName: 'projects.index',
+        },
+        requiresAuth: true,
+        title: 'Создание проекта',
+      },
+    },
+    {
       path: '/projects/create/:gameId/details',
       name: 'projects.create.details',
       component: ProjectCreateDetailsView,
@@ -284,6 +312,19 @@ const router = createRouter({
       },
     },
     {
+      path: '/projects/:id/releases/create',
+      name: 'projects.releases.create',
+      component: ProjectReleaseCreateView,
+      meta: {
+        breadcrumb: {
+          label: 'Создание релиза',
+          parentName: 'projects.index',
+        },
+        requiresAuth: true,
+        title: 'Создание релиза',
+      },
+    },
+    {
       path: '/projects/:id',
       name: 'projects.show',
       component: ProjectPreviewView,
@@ -300,6 +341,21 @@ const router = createRouter({
       path: '/projects/:id/edit',
       name: 'projects.edit',
       component: ProjectFormView,
+      beforeEnter: async (to) => {
+        const projectId = Number(to.params.id)
+
+        if (!Number.isInteger(projectId) || projectId <= 0) {
+          return { name: 'projects.index' }
+        }
+
+        try {
+          const target = await projectCreateContinueTargetById(projectId)
+
+          return target.name === 'projects.show' ? true : target
+        } catch {
+          return true
+        }
+      },
       meta: {
         breadcrumb: { parentName: 'projects.index' },
         requiresAuth: true,

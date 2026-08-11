@@ -7,8 +7,13 @@ import type {
   ProjectContentTypeOption,
   ProjectDetail,
   ProjectListItem,
+  ProjectMember,
+  ProjectMemberCandidate,
   ProjectOwnerOption,
   ProjectPublicationStatus,
+  ProjectRelease,
+  ProjectReleaseType,
+  ProjectScreenshot,
   ProjectStatus,
 } from '@staf/contracts'
 
@@ -18,8 +23,13 @@ export type {
   ProjectContentTypeOption,
   ProjectDetail,
   ProjectListItem,
+  ProjectMember,
+  ProjectMemberCandidate,
   ProjectOwnerOption,
   ProjectPublicationStatus,
+  ProjectRelease,
+  ProjectReleaseType,
+  ProjectScreenshot,
   ProjectStatus,
 } from '@staf/contracts'
 
@@ -39,6 +49,85 @@ export async function fetchProjectReleaseFilters(
   id: number | string,
 ): Promise<ListResponse<GameDimension>> {
   const response = await http.get<ListResponse<GameDimension>>(`/api/projects/${id}/release-filters`)
+
+  return response.data
+}
+
+export async function fetchProjectReleases(
+  id: number | string,
+): Promise<ListResponse<ProjectRelease>> {
+  const response = await http.get<ListResponse<ProjectRelease>>(`/api/projects/${id}/releases`)
+
+  return response.data
+}
+
+export async function fetchProjectMembers(
+  id: number | string,
+): Promise<ListResponse<ProjectMember>> {
+  const response = await http.get<ListResponse<ProjectMember>>(`/api/projects/${id}/members`)
+
+  return response.data
+}
+
+export async function searchProjectMemberCandidates(
+  id: number | string,
+  search: string,
+): Promise<ListResponse<ProjectMemberCandidate>> {
+  const response = await http.get<ListResponse<ProjectMemberCandidate>>(
+    `/api/projects/${id}/member-candidates`,
+    {
+      params: {
+        search: search || undefined,
+      },
+    },
+  )
+
+  return response.data
+}
+
+export async function addProjectMember(
+  projectId: number | string,
+  userId: number,
+): Promise<ProjectMember> {
+  const response = await http.post<ProjectMember>(`/api/projects/${projectId}/members`, {
+    user_id: userId,
+  })
+
+  return response.data
+}
+
+export type CreateProjectReleasePayload = {
+  file: File
+  title: string
+  type: ProjectReleaseType
+  changelog: unknown
+  dimensionValueIds: number[]
+}
+
+export async function createProjectRelease(
+  projectId: number | string,
+  payload: CreateProjectReleasePayload,
+): Promise<ProjectRelease> {
+  const formData = new FormData()
+
+  formData.append('file', payload.file)
+  formData.append('title', payload.title)
+  formData.append('type', payload.type)
+  formData.append('changelog', JSON.stringify(payload.changelog))
+  formData.append('dimension_value_ids', JSON.stringify(payload.dimensionValueIds))
+
+  const response = await http.post<ProjectRelease>(`/api/projects/${projectId}/releases`, formData)
+
+  return response.data
+}
+
+export async function deleteProjectRelease(
+  projectId: number | string,
+  releaseId: number | string,
+): Promise<{ message: string }> {
+  const response = await http.delete<{ message: string }>(
+    `/api/projects/${projectId}/releases/${releaseId}`,
+  )
 
   return response.data
 }
@@ -105,6 +194,43 @@ export async function saveProjectDetails(
     projectId === null ? '/api/projects' : `/api/projects/${projectId}`,
     formData,
   )
+
+  return response.data
+}
+
+export async function addProjectScreenshots(
+  id: number | string,
+  screenshots: File[],
+): Promise<ProjectDetail> {
+  const formData = new FormData()
+
+  formData.append('_method', 'PATCH')
+
+  for (const screenshot of screenshots) {
+    formData.append('screenshots[]', screenshot)
+  }
+
+  const response = await http.post<ProjectDetail>(`/api/projects/${id}`, formData)
+
+  return response.data
+}
+
+export async function reorderProjectScreenshots(
+  id: number | string,
+  mediaIds: number[],
+): Promise<ProjectDetail> {
+  const response = await http.patch<ProjectDetail>(`/api/projects/${id}/screenshots/order`, {
+    media_ids: mediaIds,
+  })
+
+  return response.data
+}
+
+export async function deleteProjectScreenshot(
+  id: number | string,
+  mediaId: number | string,
+): Promise<ProjectDetail> {
+  const response = await http.delete<ProjectDetail>(`/api/projects/${id}/screenshots/${mediaId}`)
 
   return response.data
 }

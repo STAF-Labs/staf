@@ -1002,7 +1002,7 @@ void loadPage()
 }
 
 .project-create-details__group--last {
-  padding-bottom: 0;
+  padding-bottom: 24px;
 }
 
 .project-create-details__identity {

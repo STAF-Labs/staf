@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { Pencil, Plus, RotateCcw, SlidersHorizontal, Trash2 } from '@lucide/vue'
+import type { RouteLocationRaw } from 'vue-router'
+import { Pencil, PlayCircle, Plus, RotateCcw, SlidersHorizontal, Trash2 } from '@lucide/vue'
 import AppShell from '@/components/layout/AppShell.vue'
 import DeleteModal from '@/components/ui/DeleteModal.vue'
 import SearchField from '@/components/ui/SearchField.vue'
@@ -186,6 +187,22 @@ function projectStatusClass(project: ProjectListItem): string {
   return ['gray', 'warning', 'success', 'danger'].includes(color)
     ? `project-card__status--${color}`
     : 'project-card__status--gray'
+}
+
+function projectIsDraft(project: ProjectListItem): boolean {
+  return project.status === 'draft'
+}
+
+function projectActionRoute(project: ProjectListItem): RouteLocationRaw {
+  if (projectIsDraft(project)) {
+    return { name: 'projects.continue', params: { id: String(project.id) } }
+  }
+
+  return { name: 'projects.edit', params: { id: String(project.id) } }
+}
+
+function projectActionLabel(project: ProjectListItem): string {
+  return projectIsDraft(project) ? 'Продолжить создание' : 'Редактировать проект'
 }
 
 function richTextToPlainText(value: unknown): string {
@@ -425,12 +442,18 @@ onMounted(() => {
 
               <RouterLink
                 class="icon-action"
-                :to="`/projects/${project.id}/edit`"
-                aria-label="Редактировать проект"
-                title="Редактировать проект"
+                :to="projectActionRoute(project)"
+                :aria-label="projectActionLabel(project)"
+                :title="projectActionLabel(project)"
                 @click.stop
               >
-                <Pencil :size="16" :stroke-width="2" aria-hidden="true" />
+                <PlayCircle
+                  v-if="projectIsDraft(project)"
+                  :size="16"
+                  :stroke-width="2"
+                  aria-hidden="true"
+                />
+                <Pencil v-else :size="16" :stroke-width="2" aria-hidden="true" />
               </RouterLink>
 
               <button
