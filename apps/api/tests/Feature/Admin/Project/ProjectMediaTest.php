@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Admin\Project;
 
+use App\Actions\Admin\Project\SaveProjectStep;
 use App\Enums\CommonStatus;
 use App\Enums\MembershipStatus;
 use App\Enums\Project\ProjectMemberRole;
@@ -14,6 +15,7 @@ use App\Models\Game\Project\Project;
 use App\Models\Game\Project\ProjectMember;
 use App\Models\Game\Project\ProjectRelease;
 use App\Models\User\User;
+use RuntimeException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -536,6 +538,74 @@ class ProjectMediaTest extends TestCase
         $this->assertSame('new-logo', $project->getFirstMedia('logo')?->name);
     }
 
+    public function test_failed_project_step_update_rolls_back_database_changes_and_cleans_new_media(): void
+    {
+        Storage::fake('public');
+
+        $this->app->bind(SaveProjectStep::class, FailingAfterScreenshotsSaveProjectStep::class);
+
+        [$user, $gameContentType] = $this->projectContext();
+        $project = Project::query()->create([
+            ...$this->projectPayload($user, $gameContentType),
+            'title' => 'Original Project',
+            'percentage_complete' => 20,
+        ]);
+        $oldLogo = $project
+            ->addMedia(UploadedFile::fake()->image('old-logo.png', 256, 256))
+            ->toMediaCollection('logo');
+
+        $this
+            ->actingAs($user)
+            ->post("/api/projects/{$project->id}", [
+                '_method' => 'PATCH',
+                'title' => 'Updated Project',
+                'percentage_complete' => 40,
+                'screenshots' => [
+                    UploadedFile::fake()->image('new-screenshot.png', 1280, 720),
+                ],
+                'logo' => UploadedFile::fake()->image('new-logo.png', 512, 512),
+            ], [
+                'Accept' => 'application/json',
+            ])
+            ->assertServerError();
+
+        $project->refresh();
+
+        $this->assertSame('Original Project', $project->title);
+        $this->assertSame(20, $project->percentage_complete);
+        $this->assertCount(1, $project->getMedia('logo'));
+        $this->assertSame($oldLogo->id, $project->getFirstMedia('logo')?->id);
+        $this->assertCount(0, $project->getMedia('screenshots'));
+        $this->assertDatabaseCount('media', 1);
+        $this->assertCount(1, Storage::disk('public')->allFiles());
+    }
+
+    public function test_failed_first_project_step_does_not_leave_partial_draft_or_media(): void
+    {
+        Storage::fake('public');
+
+        $this->app->bind(SaveProjectStep::class, FailingAfterScreenshotsSaveProjectStep::class);
+
+        [$user, $gameContentType] = $this->projectContext();
+
+        $this
+            ->actingAs($user)
+            ->post('/api/projects', [
+                ...$this->projectPayload($user, $gameContentType),
+                'logo' => UploadedFile::fake()->image('logo.png', 512, 512),
+                'screenshots' => [
+                    UploadedFile::fake()->image('screenshot.png', 1280, 720),
+                ],
+            ], [
+                'Accept' => 'application/json',
+            ])
+            ->assertServerError();
+
+        $this->assertDatabaseCount('projects', 0);
+        $this->assertDatabaseCount('media', 0);
+        $this->assertCount(0, Storage::disk('public')->allFiles());
+    }
+
     /**
      * @return array{User, GameContentType}
      */
@@ -579,5 +649,13 @@ class ProjectMediaTest extends TestCase
             ],
             'status' => 'draft',
         ];
+    }
+}
+
+class FailingAfterScreenshotsSaveProjectStep extends SaveProjectStep
+{
+    protected function replaceLogo(Project $project, ?UploadedFile $logo, array &$createdMedia): void
+    {
+        throw new RuntimeException('Simulated step save failure.');
     }
 }

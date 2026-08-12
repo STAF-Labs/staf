@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\Admin\Project;
 
+use App\Actions\Admin\Project\SaveProjectStep;
 use App\Enums\CommonStatus;
 use App\Enums\MembershipStatus;
 use App\Enums\Org\OrgMemberRole;
@@ -25,7 +26,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Gate;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
@@ -270,7 +271,7 @@ class ProjectController extends Controller
         );
     }
 
-    public function store(StoreProjectRequest $request): JsonResponse
+    public function store(StoreProjectRequest $request, SaveProjectStep $saveProjectStep): JsonResponse
     {
         $validated = $request->validated();
         $author = match ($validated['ownerable_type']) {
@@ -280,18 +281,11 @@ class ProjectController extends Controller
 
         Gate::forUser($request->user())->authorize('create', [Project::class, $author]);
 
-        $project = Project::create(Arr::except(
+        $project = $saveProjectStep->execute(
             $validated,
-            ['logo', 'screenshots', 'dimension_value_ids']
-        ));
-
-        $project->addMediaFromRequest('logo')->toMediaCollection('logo');
-
-        foreach ($request->file('screenshots', []) as $screenshot) {
-            $project->addMedia($screenshot)->toMediaCollection('screenshots');
-        }
-
-        $project->dimensionValues()->sync($validated['dimension_value_ids'] ?? []);
+            logo: $this->uploadedFile($request, 'logo'),
+            screenshots: $this->uploadedFiles($request, 'screenshots'),
+        );
 
         return response()->json(
             ProjectResource::make(
@@ -312,25 +306,20 @@ class ProjectController extends Controller
         );
     }
 
-    public function update(UpdateProjectRequest $request, Project $project): JsonResponse
+    public function update(
+        UpdateProjectRequest $request,
+        Project $project,
+        SaveProjectStep $saveProjectStep
+    ): JsonResponse
     {
         $validated = $request->validated();
-        $project->update(Arr::except(
+
+        $project = $saveProjectStep->execute(
             $validated,
-            ['logo', 'screenshots', 'dimension_value_ids']
-        ));
-
-        if ($request->hasFile('logo')) {
-            $project->addMediaFromRequest('logo')->toMediaCollection('logo');
-        }
-
-        foreach ($request->file('screenshots', []) as $screenshot) {
-            $project->addMedia($screenshot)->toMediaCollection('screenshots');
-        }
-
-        if (array_key_exists('dimension_value_ids', $validated)) {
-            $project->dimensionValues()->sync($validated['dimension_value_ids'] ?? []);
-        }
+            $project,
+            $this->uploadedFile($request, 'logo'),
+            $this->uploadedFiles($request, 'screenshots'),
+        );
 
         return response()->json(
             ProjectResource::make(
@@ -414,5 +403,29 @@ class ProjectController extends Controller
         return response()->json([
             'message' => 'Проект удален.',
         ]);
+    }
+
+    private function uploadedFile(Request $request, string $key): ?UploadedFile
+    {
+        $file = $request->file($key);
+
+        return $file instanceof UploadedFile ? $file : null;
+    }
+
+    /**
+     * @return list<UploadedFile>
+     */
+    private function uploadedFiles(Request $request, string $key): array
+    {
+        $files = $request->file($key, []);
+
+        if (! is_array($files)) {
+            return [];
+        }
+
+        return collect($files)
+            ->filter(fn (mixed $file): bool => $file instanceof UploadedFile)
+            ->values()
+            ->all();
     }
 }
