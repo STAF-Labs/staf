@@ -63,7 +63,12 @@ class ProjectStateTest extends TestCase
                 'description' => [
                     'type' => 'doc',
                     'content' => [
-                        ['type' => 'paragraph'],
+                        [
+                            'type' => 'paragraph',
+                            'content' => [
+                                ['type' => 'text', 'text' => 'Описание проекта.'],
+                            ],
+                        ],
                     ],
                 ],
                 'percentage_complete' => 100,
@@ -83,6 +88,41 @@ class ProjectStateTest extends TestCase
         $this->assertSame(100, $project->percentage_complete);
         $this->assertSame(ProjectPublicationStatus::PUBLIC, $project->publication_status);
         $this->assertSame(ProjectStatus::PUBLISHED, $project->status);
+    }
+
+    public function test_project_rich_text_fields_must_contain_text_when_present(): void
+    {
+        Storage::fake('public');
+
+        [$user, $gameContentType] = $this->projectContext();
+
+        $this
+            ->actingAs($user)
+            ->postJson('/api/projects', [
+                ...$this->projectPayload($user, $gameContentType),
+                'summary' => [
+                    'type' => 'doc',
+                    'content' => [],
+                ],
+                'logo' => UploadedFile::fake()->image('logo.png', 512, 512),
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['summary']);
+
+        $project = Project::query()->create($this->projectPayload($user, $gameContentType));
+
+        $this
+            ->actingAs($user)
+            ->patchJson("/api/projects/{$project->id}", [
+                'description' => [
+                    'type' => 'doc',
+                    'content' => [
+                        ['type' => 'paragraph'],
+                    ],
+                ],
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['description']);
     }
 
     public function test_project_state_fields_are_validated(): void

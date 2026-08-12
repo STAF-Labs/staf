@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin\Game;
 
 use App\Enums\CommonStatus;
+use App\Rules\FilledTipTapDocument;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -20,7 +21,7 @@ class UpdateGameRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:64'],
-            'description' => ['nullable', 'json'],
+            'description' => ['nullable', 'json', new FilledTipTapDocument],
             'released_at' => ['nullable', 'date_format:Y-m-d'],
             'status' => ['required', Rule::enum(CommonStatus::class)],
             'logo' => [

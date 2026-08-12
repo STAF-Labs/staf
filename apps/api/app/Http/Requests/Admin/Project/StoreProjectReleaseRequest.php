@@ -5,6 +5,7 @@ namespace App\Http\Requests\Admin\Project;
 use App\Enums\Project\ProjectReleaseType;
 use App\Models\Game\Filter\Dimension;
 use App\Models\Game\Project\Project;
+use App\Rules\FilledTipTapDocument;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -35,7 +36,7 @@ class StoreProjectReleaseRequest extends FormRequest
             ],
             'title' => ['required', 'string', 'max:64'],
             'type' => ['required', Rule::enum(ProjectReleaseType::class)],
-            'changelog' => ['required', 'array'],
+            'changelog' => ['required', 'array', new FilledTipTapDocument],
             'dimension_value_ids' => ['nullable', 'array'],
             'dimension_value_ids.*' => ['integer', 'distinct', Rule::exists('dimension_values', 'id')],
         ];

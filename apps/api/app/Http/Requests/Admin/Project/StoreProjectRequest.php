@@ -5,6 +5,7 @@ namespace App\Http\Requests\Admin\Project;
 use App\Models\Game\Filter\Dimension;
 use App\Models\Org\Organization;
 use App\Models\User\User;
+use App\Rules\FilledTipTapDocument;
 use App\Services\Admin\Licence\SpdxLicenceCatalog;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -50,8 +51,8 @@ class StoreProjectRequest extends FormRequest
             'game_content_type_id' => ['required', 'integer', Rule::exists('game_content_types', 'id')],
             'title' => ['required', 'string', 'max:128'],
             'slug' => ['nullable', 'string', 'max:128', 'unique:projects,slug'],
-            'summary' => ['nullable', 'array'],
-            'description' => ['nullable', 'array'],
+            'summary' => ['nullable', 'array', new FilledTipTapDocument],
+            'description' => ['nullable', 'array', new FilledTipTapDocument],
             'tags' => ['nullable', 'array'],
             'tags.*' => ['string', 'min:3'],
             'website_urls' => ['nullable', 'array'],

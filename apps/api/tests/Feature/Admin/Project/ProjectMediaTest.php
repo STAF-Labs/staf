@@ -106,7 +106,14 @@ class ProjectMediaTest extends TestCase
                 'type' => 'beta',
                 'changelog' => [
                     'type' => 'doc',
-                    'content' => [],
+                    'content' => [
+                        [
+                            'type' => 'paragraph',
+                            'content' => [
+                                ['type' => 'text', 'text' => 'Первый релиз.'],
+                            ],
+                        ],
+                    ],
                 ],
                 'dimension_value_ids' => [$value->id],
             ])
@@ -137,6 +144,28 @@ class ProjectMediaTest extends TestCase
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.title', '1.0.0')
             ->assertJsonPath('data.0.dimension_value_ids.0', $value->id);
+    }
+
+    public function test_project_release_changelog_must_contain_text(): void
+    {
+        [$user, $gameContentType] = $this->projectContext();
+        $project = Project::query()->create($this->projectPayload($user, $gameContentType));
+
+        $this
+            ->actingAs($user)
+            ->postJson("/api/projects/{$project->id}/releases", [
+                'file' => UploadedFile::fake()->create('release.zip', 10, 'application/zip'),
+                'title' => '1.0.0',
+                'type' => 'beta',
+                'changelog' => [
+                    'type' => 'doc',
+                    'content' => [
+                        ['type' => 'paragraph'],
+                    ],
+                ],
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['changelog']);
     }
 
     public function test_admin_can_search_active_users_and_invite_project_member(): void
@@ -643,10 +672,6 @@ class ProjectMediaTest extends TestCase
             'ownerable_id' => $user->id,
             'game_content_type_id' => $gameContentType->id,
             'title' => 'Media Project',
-            'description' => [
-                'type' => 'doc',
-                'content' => [],
-            ],
             'status' => 'draft',
         ];
     }

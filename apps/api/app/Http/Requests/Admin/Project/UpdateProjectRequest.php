@@ -6,6 +6,7 @@ use App\Enums\Project\ProjectPublicationStatus;
 use App\Enums\Project\ProjectStatus;
 use App\Models\Game\Filter\Dimension;
 use App\Models\Game\Project\Project;
+use App\Rules\FilledTipTapDocument;
 use App\Services\Admin\Licence\SpdxLicenceCatalog;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -36,8 +37,8 @@ class UpdateProjectRequest extends FormRequest
             'game_content_type_id' => ['sometimes', 'integer', Rule::exists('game_content_types', 'id')],
             'title' => ['sometimes', 'string', 'max:128'],
             'slug' => ['sometimes', 'nullable', 'string', 'max:128', Rule::unique('projects', 'slug')->ignore($this->route('project'))],
-            'summary' => ['sometimes', 'nullable', 'array'],
-            'description' => ['sometimes', 'nullable', 'array'],
+            'summary' => ['sometimes', 'nullable', 'array', new FilledTipTapDocument],
+            'description' => ['sometimes', 'nullable', 'array', new FilledTipTapDocument],
             'tags' => ['sometimes', 'nullable', 'array'],
             'tags.*' => ['string', 'min:3'],
             'website_urls' => ['sometimes', 'nullable', 'array'],

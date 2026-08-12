@@ -146,7 +146,14 @@ class GameStoreTest extends TestCase
                 'name' => 'Updated Game',
                 'description' => json_encode([
                     'type' => 'doc',
-                    'content' => [],
+                    'content' => [
+                        [
+                            'type' => 'paragraph',
+                            'content' => [
+                                ['type' => 'text', 'text' => 'Обновленное описание игры.'],
+                            ],
+                        ],
+                    ],
                 ]),
                 'released_at' => '2026-07-17',
                 'status' => 'suspended',
@@ -161,6 +168,57 @@ class GameStoreTest extends TestCase
             'name' => 'Updated Game',
             'status' => 'suspended',
         ]);
+    }
+
+    public function test_game_description_must_contain_text_when_creating_game(): void
+    {
+        $user = User::query()->create([
+            'username' => 'admin',
+            'email' => 'admin@example.com',
+            'password' => 'password',
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->postJson('/api/games', [
+                'name' => 'Empty Description Game',
+                'description' => json_encode([
+                    'type' => 'doc',
+                    'content' => [],
+                ]),
+                'status' => 'active',
+                'banner' => UploadedFile::fake()->image('banner.webp', 1600, 600),
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['description']);
+    }
+
+    public function test_game_description_must_contain_text_when_updating_game(): void
+    {
+        $user = User::query()->create([
+            'username' => 'admin',
+            'email' => 'admin@example.com',
+            'password' => 'password',
+        ]);
+        $game = Game::query()->create([
+            'name' => 'Old Game',
+            'status' => 'active',
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->patchJson("/api/games/{$game->id}", [
+                'name' => 'Updated Game',
+                'description' => json_encode([
+                    'type' => 'doc',
+                    'content' => [
+                        ['type' => 'paragraph'],
+                    ],
+                ]),
+                'status' => 'active',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['description']);
     }
 
     public function test_admin_can_update_game_with_multipart_method_spoofing(): void
