@@ -1,4 +1,4 @@
-# ADR 0001: Content Interaction Events
+# ADR-0001: Content Interaction Events
 
 ## Status
 

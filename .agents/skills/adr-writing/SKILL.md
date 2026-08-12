@@ -54,17 +54,18 @@ docs/adr/_template.md
 Файл называй по шаблону:
 
 ```text
-ADR-YYYY-MM-DD-title-kebab-case.md
+ADR-NNNN-title-kebab-case.md
 ```
 
 Примеры:
 
 ```text
-ADR-2026-07-17-project-catalog-architecture.md
-ADR-2026-07-17-admin-frontend-architecture.md
-ADR-2026-07-17-organization-permissions.md
+ADR-0007-project-catalog-architecture.md
+ADR-0008-admin-frontend-architecture.md
+ADR-0009-organization-permissions.md
 ```
 
+Номер должен быть следующим свободным четырехзначным номером в `docs/adr/`.
 Название должно быть коротким, понятным и в `kebab-case`.
 
 ## Язык

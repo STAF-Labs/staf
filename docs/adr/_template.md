@@ -1,4 +1,4 @@
-# ADR-YYYY-MM-DD: Название решения
+# ADR-0000: Название решения
 
 ## Статус
 
@@ -154,8 +154,8 @@ YYYY-MM-DD
 Пример:
 
 ```text
-Заменяет: docs/adr/ADR-2026-07-17-old-decision.md
-Связано с: docs/adr/ADR-2026-07-17-project-catalog-architecture.md
+Заменяет: docs/adr/ADR-0007-old-decision.md
+Связано с: docs/adr/ADR-0008-project-catalog-architecture.md
 ```
 
 Если связанных ADR нет:

@@ -1,4 +1,4 @@
-# ADR-2026-08-11: Вкладка участников проекта при авторе-организации
+# ADR-0008: Вкладка участников проекта при авторе-организации
 
 ## Статус
 
@@ -163,8 +163,8 @@ Backend должен остаться источником истины для �
 
 Связано с:
 
-- `docs/adr/ADR-2026-08-08-project-authorship-and-organization-permissions.md`;
-- `docs/adr/0006-project-creation-drafts.md`.
+- `docs/adr/ADR-0007-project-authorship-and-organization-permissions.md`;
+- `docs/adr/ADR-0006-project-creation-drafts.md`.
 
 ## Примечания
 

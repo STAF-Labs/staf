@@ -1,4 +1,4 @@
-# ADR 0006: Серверные черновики создания проектов
+# ADR-0006: Серверные черновики создания проектов
 
 ## Статус
 
@@ -182,9 +182,9 @@ Frontend создает черновик после выбора игры или
 
 ## Связанные ADR
 
-Связано с: `docs/adr/0004-project-and-release-dimensions.md`
+Связано с: `docs/adr/ADR-0004-project-and-release-dimensions.md`
 
-Связано с: `docs/adr/0005-license-recognition-microservice.md`
+Связано с: `docs/adr/ADR-0005-license-recognition-microservice.md`
 
 ## Примечания
 

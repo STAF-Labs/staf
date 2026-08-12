@@ -1,4 +1,4 @@
-# ADR-2026-08-08: Автор проекта и права организаций
+# ADR-0007: Автор проекта и права организаций
 
 ## Статус
 
@@ -143,9 +143,9 @@ API проекта возвращает единое поле `owner_name`: disp
 
 ## Связанные ADR
 
-Связано с: `docs/adr/0002-staf-monorepo.md`
+Связано с: `docs/adr/ADR-0002-staf-monorepo.md`
 
-Связано с: `docs/adr/0006-project-creation-drafts.md`
+Связано с: `docs/adr/ADR-0006-project-creation-drafts.md`
 
 ## Примечания
 

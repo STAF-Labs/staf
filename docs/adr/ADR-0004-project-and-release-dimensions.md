@@ -1,4 +1,4 @@
-# ADR 0004: Значения dimensions на уровне проекта и релиза
+# ADR-0004: Значения dimensions на уровне проекта и релиза
 
 ## Статус
 
@@ -194,9 +194,9 @@ Backend обязан проверять при сохранении значен
 
 ## Связанные ADR
 
-Связано с: `docs/adr/0002-staf-monorepo.md`
+Связано с: `docs/adr/ADR-0002-staf-monorepo.md`
 
-Связано с: `docs/adr/0003-content-type-import-format.md`
+Связано с: `docs/adr/ADR-0003-content-type-import-format.md`
 
 ## Примечания
 

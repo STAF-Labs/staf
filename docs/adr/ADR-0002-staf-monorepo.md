@@ -1,4 +1,4 @@
-# ADR 0002: Monorepo Structure
+# ADR-0002: Monorepo Structure
 
 ## Status
 
