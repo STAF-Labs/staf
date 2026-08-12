@@ -21,7 +21,7 @@ import ProjectCreateNextView from '@/views/projects/ProjectCreateNextView.vue'
 import ProjectGameSelectView from '@/views/projects/ProjectGameSelectView.vue'
 import ProjectPreviewView from '@/views/projects/ProjectPreviewView.vue'
 import ProjectFormView from '@/views/projects/ProjectFormView.vue'
-import ProjectReleaseCreateView from '@/views/projects/ProjectReleaseCreateView.vue'
+import ProjectReleaseFormView from '@/views/projects/ProjectReleaseFormView.vue'
 import ProjectsView from '@/views/projects/ProjectsView.vue'
 import UserView from '@/views/users/UserView.vue'
 
@@ -314,7 +314,7 @@ const router = createRouter({
     {
       path: '/projects/:id/releases/create',
       name: 'projects.releases.create',
-      component: ProjectReleaseCreateView,
+      component: ProjectReleaseFormView,
       meta: {
         breadcrumb: {
           label: 'Создание релиза',
@@ -322,6 +322,19 @@ const router = createRouter({
         },
         requiresAuth: true,
         title: 'Создание релиза',
+      },
+    },
+    {
+      path: '/projects/:id/releases/:releaseId/edit',
+      name: 'projects.releases.edit',
+      component: ProjectReleaseFormView,
+      meta: {
+        breadcrumb: {
+          label: 'Редактирование релиза',
+          parentName: 'projects.index',
+        },
+        requiresAuth: true,
+        title: 'Редактирование релиза',
       },
     },
     {

@@ -168,6 +168,152 @@ class ProjectMediaTest extends TestCase
             ->assertJsonValidationErrors(['changelog']);
     }
 
+    public function test_admin_can_view_and_update_project_release(): void
+    {
+        [$user, $gameContentType] = $this->projectContext();
+        $project = Project::query()->create($this->projectPayload($user, $gameContentType));
+        $dimension = Dimension::query()->create([
+            'game_content_type_id' => $gameContentType->id,
+            'name' => 'Версия игры',
+            'selection_mode' => 'single',
+            'applies_to' => 'release',
+            'is_filterable' => true,
+            'is_required' => true,
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
+        $value = $dimension->values()->create([
+            'name' => '1.20',
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+        $replacementValue = $dimension->values()->create([
+            'name' => '1.21',
+            'sort_order' => 2,
+            'is_active' => true,
+        ]);
+        $release = ProjectRelease::query()->create([
+            'project_id' => $project->id,
+            'title' => '1.0.0',
+            'slug' => '1-0-0',
+            'type' => 'beta',
+            'status' => 'on_moderation',
+            'changelog' => [
+                'type' => 'doc',
+                'content' => [
+                    [
+                        'type' => 'paragraph',
+                        'content' => [
+                            ['type' => 'text', 'text' => 'Первый релиз.'],
+                        ],
+                    ],
+                ],
+            ],
+            'released_at' => today(),
+        ]);
+        $release->dimensionValues()->sync([$value->id]);
+        $release->addMedia(UploadedFile::fake()->create('old-release.zip', 10, 'application/zip'))
+            ->toMediaCollection('release');
+
+        $this
+            ->actingAs($user)
+            ->getJson("/api/projects/{$project->id}/releases/{$release->id}")
+            ->assertOk()
+            ->assertJsonPath('id', $release->id)
+            ->assertJsonPath('file_name', 'old-release.zip')
+            ->assertJsonPath('dimension_value_ids.0', $value->id);
+
+        $this
+            ->actingAs($user)
+            ->post("/api/projects/{$project->id}/releases/{$release->id}", [
+                '_method' => 'PATCH',
+                'file' => UploadedFile::fake()->create('new-release.zip', 10, 'application/zip'),
+                'title' => '1.1.0',
+                'type' => 'release',
+                'changelog' => [
+                    'type' => 'doc',
+                    'content' => [
+                        [
+                            'type' => 'paragraph',
+                            'content' => [
+                                ['type' => 'text', 'text' => 'Обновленный релиз.'],
+                            ],
+                        ],
+                    ],
+                ],
+                'dimension_value_ids' => [$replacementValue->id],
+            ], [
+                'Accept' => 'application/json',
+            ])
+            ->assertOk()
+            ->assertJsonPath('title', '1.1.0')
+            ->assertJsonPath('type', 'release')
+            ->assertJsonPath('file_name', 'new-release.zip')
+            ->assertJsonPath('dimension_value_ids.0', $replacementValue->id);
+
+        $release->refresh();
+
+        $this->assertSame('1.1.0', $release->title);
+        $this->assertSame('new-release.zip', $release->getFirstMedia('release')?->file_name);
+        $this->assertCount(1, $release->getMedia('release'));
+        $this->assertDatabaseMissing('project_release_dimension_values', [
+            'project_release_id' => $release->id,
+            'dimension_value_id' => $value->id,
+        ]);
+        $this->assertDatabaseHas('project_release_dimension_values', [
+            'project_release_id' => $release->id,
+            'dimension_value_id' => $replacementValue->id,
+        ]);
+    }
+
+    public function test_project_release_update_rejects_foreign_release(): void
+    {
+        [$user, $gameContentType] = $this->projectContext();
+        $project = Project::query()->create($this->projectPayload($user, $gameContentType));
+        $anotherProject = Project::query()->create([
+            ...$this->projectPayload($user, $gameContentType),
+            'title' => 'Another Media Project',
+        ]);
+        $foreignRelease = ProjectRelease::query()->create([
+            'project_id' => $anotherProject->id,
+            'title' => '1.0.0',
+            'slug' => '1-0-0',
+            'type' => 'release',
+            'status' => 'on_moderation',
+            'changelog' => [
+                'type' => 'doc',
+                'content' => [
+                    [
+                        'type' => 'paragraph',
+                        'content' => [
+                            ['type' => 'text', 'text' => 'Чужой релиз.'],
+                        ],
+                    ],
+                ],
+            ],
+            'released_at' => today(),
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->patchJson("/api/projects/{$project->id}/releases/{$foreignRelease->id}", [
+                'title' => '1.1.0',
+                'type' => 'release',
+                'changelog' => [
+                    'type' => 'doc',
+                    'content' => [
+                        [
+                            'type' => 'paragraph',
+                            'content' => [
+                                ['type' => 'text', 'text' => 'Попытка обновления.'],
+                            ],
+                        ],
+                    ],
+                ],
+            ])
+            ->assertNotFound();
+    }
+
     public function test_admin_can_search_active_users_and_invite_project_member(): void
     {
         [$user, $gameContentType] = $this->projectContext();

@@ -2,15 +2,15 @@
 
 namespace App\Http\Controllers\Api\Admin\Project;
 
-use App\Enums\Project\ProjectReleaseStatus;
+use App\Actions\Admin\Project\SaveProjectRelease;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Project\StoreProjectReleaseRequest;
+use App\Http\Requests\Admin\Project\UpdateProjectReleaseRequest;
 use App\Http\Resources\Game\Project\ProjectReleaseResource;
 use App\Models\Game\Project\Project;
 use App\Models\Game\Project\ProjectRelease;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Gate;
 
 class ProjectReleaseController extends Controller
@@ -30,24 +30,58 @@ class ProjectReleaseController extends Controller
         ]);
     }
 
-    public function store(StoreProjectReleaseRequest $request, Project $project): JsonResponse
+    public function show(Request $request, Project $project, ProjectRelease $release): JsonResponse
     {
-        $validated = $request->validated();
+        Gate::forUser($request->user())->authorize('update', $project);
 
-        $release = $project->releases()->create([
-            ...Arr::except($validated, ['file', 'dimension_value_ids']),
-            'released_at' => today()->toDateString(),
-            'status' => ProjectReleaseStatus::ON_MODERATION->value,
-        ]);
+        abort_if($release->project_id !== $project->id, 404);
 
-        $release->addMediaFromRequest('file')->toMediaCollection('release');
-        $release->dimensionValues()->sync($validated['dimension_value_ids'] ?? []);
+        return response()->json(
+            ProjectReleaseResource::make(
+                $release->load('media', 'dimensionValues')
+            )->resolve($request)
+        );
+    }
+
+    public function store(
+        StoreProjectReleaseRequest $request,
+        Project $project,
+        SaveProjectRelease $saveProjectRelease
+    ): JsonResponse
+    {
+        $release = $saveProjectRelease->execute(
+            $project,
+            $request->validated(),
+            file: $request->file('file')
+        );
 
         return response()->json(
             ProjectReleaseResource::make(
                 $release->load('media', 'dimensionValues')
             )->resolve($request),
             201
+        );
+    }
+
+    public function update(
+        UpdateProjectReleaseRequest $request,
+        Project $project,
+        ProjectRelease $release,
+        SaveProjectRelease $saveProjectRelease
+    ): JsonResponse {
+        abort_if($release->project_id !== $project->id, 404);
+
+        $release = $saveProjectRelease->execute(
+            $project,
+            $request->validated(),
+            $release,
+            $request->file('file')
+        );
+
+        return response()->json(
+            ProjectReleaseResource::make(
+                $release->load('media', 'dimensionValues')
+            )->resolve($request)
         );
     }
 

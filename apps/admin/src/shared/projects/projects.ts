@@ -61,6 +61,17 @@ export async function fetchProjectReleases(
   return response.data
 }
 
+export async function fetchProjectRelease(
+  projectId: number | string,
+  releaseId: number | string,
+): Promise<ProjectRelease> {
+  const response = await http.get<ProjectRelease>(
+    `/api/projects/${projectId}/releases/${releaseId}`,
+  )
+
+  return response.data
+}
+
 export async function fetchProjectMembers(
   id: number | string,
 ): Promise<ListResponse<ProjectMember>> {
@@ -117,6 +128,40 @@ export async function createProjectRelease(
   formData.append('dimension_value_ids', JSON.stringify(payload.dimensionValueIds))
 
   const response = await http.post<ProjectRelease>(`/api/projects/${projectId}/releases`, formData)
+
+  return response.data
+}
+
+export type UpdateProjectReleasePayload = {
+  file: File | null
+  title: string
+  type: ProjectReleaseType
+  changelog: unknown
+  dimensionValueIds: number[]
+}
+
+export async function updateProjectRelease(
+  projectId: number | string,
+  releaseId: number | string,
+  payload: UpdateProjectReleasePayload,
+): Promise<ProjectRelease> {
+  const formData = new FormData()
+
+  formData.append('_method', 'PATCH')
+
+  if (payload.file) {
+    formData.append('file', payload.file)
+  }
+
+  formData.append('title', payload.title)
+  formData.append('type', payload.type)
+  formData.append('changelog', JSON.stringify(payload.changelog))
+  formData.append('dimension_value_ids', JSON.stringify(payload.dimensionValueIds))
+
+  const response = await http.post<ProjectRelease>(
+    `/api/projects/${projectId}/releases/${releaseId}`,
+    formData,
+  )
 
   return response.data
 }

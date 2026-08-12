@@ -9,8 +9,11 @@ import type { GameDimension } from '@/shared/games/games'
 import {
   createProjectRelease,
   fetchProject,
+  fetchProjectRelease,
   fetchProjectReleaseFilters,
   type ProjectDetail,
+  type ProjectRelease,
+  updateProjectRelease,
 } from '@/shared/projects/projects'
 import '@/assets/styles/game-form.css'
 
@@ -31,6 +34,7 @@ const releaseTypeOptions = [
 const route = useRoute()
 const router = useRouter()
 const project = ref<ProjectDetail | null>(null)
+const release = ref<ProjectRelease | null>(null)
 const releaseFilters = ref<GameDimension[]>([])
 const isLoading = ref(true)
 const isSaving = ref(false)
@@ -41,6 +45,16 @@ const changelogError = ref('')
 const releaseFiltersError = ref('')
 const releaseFileInput = ref<HTMLInputElement | null>(null)
 const projectId = computed(() => Number(route.params.id))
+const releaseId = computed(() => Number(route.params.releaseId))
+const isEditMode = computed(() => route.name === 'projects.releases.edit')
+const pageTitle = computed(() => (isEditMode.value ? 'Редактирование релиза' : 'Новый релиз'))
+const submitLabel = computed(() => {
+  if (isSaving.value) {
+    return 'Сохранение...'
+  }
+
+  return isEditMode.value ? 'Сохранить релиз' : 'Создать релиз'
+})
 const form = reactive<ReleaseForm>({
   file: null,
   title: '',
@@ -63,22 +77,37 @@ async function loadProject(): Promise<void> {
   message.value = ''
 
   try {
-    const [projectResponse, filtersResponse] = await Promise.all([
+    const [projectResponse, filtersResponse, releaseResponse] = await Promise.all([
       fetchProject(projectId.value),
       fetchProjectReleaseFilters(projectId.value),
+      isEditMode.value ? fetchProjectRelease(projectId.value, releaseId.value) : Promise.resolve(null),
     ])
 
     project.value = projectResponse
+    release.value = releaseResponse
     releaseFilters.value = filtersResponse.data.map((dimension) => ({
       ...dimension,
       values: dimension.values.filter((value) => value.is_active),
     }))
     form.dimensionValueIds = Object.fromEntries(
-      releaseFilters.value.map((filter) => [filter.id, '']),
+      releaseFilters.value.map((filter) => [
+        filter.id,
+        String(release.value?.dimension_value_ids?.find((valueId) =>
+          filter.values.some((value) => value.id === valueId),
+        ) ?? ''),
+      ]),
     )
+
+    if (release.value) {
+      form.title = release.value.title
+      form.type = release.value.type
+      form.changelog = release.value.changelog
+    }
+
     await nextTick()
+    changelogEditor.value?.commands.setContent(release.value?.changelog || '')
   } catch {
-    message.value = 'Не удалось загрузить проект.'
+    message.value = isEditMode.value ? 'Не удалось загрузить релиз.' : 'Не удалось загрузить проект.'
   } finally {
     isLoading.value = false
   }
@@ -119,7 +148,7 @@ async function submitRelease(): Promise<void> {
   changelogError.value = ''
   releaseFiltersError.value = ''
 
-  if (!form.file) {
+  if (!form.file && !isEditMode.value) {
     fileError.value = 'Добавьте файл релиза.'
   }
 
@@ -141,7 +170,7 @@ async function submitRelease(): Promise<void> {
     }
   }
 
-  if (fileError.value || titleError.value || changelogError.value || releaseFiltersError.value || !editor || !form.file) {
+  if (fileError.value || titleError.value || changelogError.value || releaseFiltersError.value || !editor) {
     return
   }
 
@@ -150,17 +179,26 @@ async function submitRelease(): Promise<void> {
   message.value = ''
 
   try {
-    await createProjectRelease(projectId.value, {
+    const payload = {
       file: form.file,
       title: form.title,
       type: form.type,
       changelog: form.changelog,
       dimensionValueIds: selectedDimensionValueIds,
-    })
+    }
+
+    if (isEditMode.value) {
+      await updateProjectRelease(projectId.value, releaseId.value, payload)
+    } else {
+      await createProjectRelease(projectId.value, {
+        ...payload,
+        file: form.file as File,
+      })
+    }
 
     await router.push({ name: 'projects.edit', params: { id: String(projectId.value) } })
   } catch {
-    message.value = 'Не удалось создать релиз.'
+    message.value = isEditMode.value ? 'Не удалось сохранить релиз.' : 'Не удалось создать релиз.'
   } finally {
     isSaving.value = false
   }
@@ -212,7 +250,7 @@ void loadProject()
           </RouterLink>
 
           <div>
-            <h1>Новый релиз</h1>
+            <h1>{{ pageTitle }}</h1>
             <div class="project-release-create__meta">
               <span>{{ project.title }}</span>
               <span v-if="project.game_name">{{ project.game_name }}</span>
@@ -234,7 +272,7 @@ void loadProject()
               class="game-upload project-release-create__file-upload"
               :class="{
                 'game-upload--invalid': fileError,
-                'game-upload--empty': !form.file,
+                'game-upload--empty': !form.file && !release?.file_name,
               }"
               @click="!form.file ? openReleaseFilePicker() : undefined"
             >
@@ -251,9 +289,19 @@ void loadProject()
               </span>
               <span class="game-upload__content">
                 <span class="game-upload__title">
-                  {{ form.file ? form.file.name : 'Выберите файл релиза' }}
+                  {{
+                    form.file
+                      ? form.file.name
+                      : release?.file_name || 'Выберите файл релиза'
+                  }}
                 </span>
-                <span class="game-upload__file">Формат зависит от игры и типа проекта</span>
+                <span class="game-upload__file">
+                  {{
+                    isEditMode && !form.file && release?.file_name
+                      ? 'Текущий файл будет сохранён'
+                      : 'Формат зависит от игры и типа проекта'
+                  }}
+                </span>
               </span>
 
               <div v-if="form.file" class="game-upload__actions">
@@ -278,7 +326,12 @@ void loadProject()
               </div>
             </span>
             <span class="game-form-help" :class="{ 'game-form-help--error': fileError }">
-              {{ fileError || 'Добавьте файл, который относится к этому релизу.' }}
+              {{
+                fileError ||
+                (isEditMode
+                  ? 'Оставьте пустым, если файл релиза менять не нужно.'
+                  : 'Добавьте файл, который относится к этому релизу.')
+              }}
             </span>
           </label>
 
@@ -420,7 +473,7 @@ void loadProject()
 
             <button class="button button-primary" type="submit" :disabled="isSaving">
               <Save :size="18" :stroke-width="1.9" aria-hidden="true" />
-              <span>{{ isSaving ? 'Сохранение...' : 'Создать релиз' }}</span>
+              <span>{{ submitLabel }}</span>
             </button>
           </div>
         </form>

@@ -878,6 +878,20 @@ function openReleaseDeleteModal(release: ProjectRelease): void {
   pendingDeleteRelease.value = release
 }
 
+async function openReleaseEditPage(release: ProjectRelease): Promise<void> {
+  if (!project.value) {
+    return
+  }
+
+  await router.push({
+    name: 'projects.releases.edit',
+    params: {
+      id: String(project.value.id),
+      releaseId: String(release.id),
+    },
+  })
+}
+
 function closeReleaseDeleteModal(): void {
   if (deletingReleaseId.value !== null) {
     return
@@ -2311,6 +2325,7 @@ onBeforeUnmount(() => {
                 :releases="visibleProjectReleases"
                 :release-filters="releaseFilters"
                 :columns="visibleReleaseColumns"
+                @edit-release="openReleaseEditPage"
                 @delete-release="openReleaseDeleteModal"
               />
 

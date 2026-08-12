@@ -10,7 +10,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
-class StoreProjectReleaseRequest extends FormRequest
+class UpdateProjectReleaseRequest extends FormRequest
 {
     use ValidatesProjectReleaseDimensions;
 
@@ -33,7 +33,7 @@ class StoreProjectReleaseRequest extends FormRequest
     {
         return [
             'file' => [
-                'required',
+                'nullable',
                 'file',
             ],
             'title' => ['required', 'string', 'max:64'],

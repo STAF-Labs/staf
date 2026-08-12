@@ -52,6 +52,8 @@ Route::middleware('auth:sanctum')->group(function (): void {
     Route::post('/projects', [ProjectController::class, 'store']);
     Route::get('/projects/{project}/releases', [ProjectReleaseController::class, 'index']);
     Route::post('/projects/{project}/releases', [ProjectReleaseController::class, 'store']);
+    Route::get('/projects/{project}/releases/{release}', [ProjectReleaseController::class, 'show']);
+    Route::patch('/projects/{project}/releases/{release}', [ProjectReleaseController::class, 'update']);
     Route::delete('/projects/{project}/releases/{release}', [ProjectReleaseController::class, 'destroy']);
     Route::get('/projects/{project}/release-filters', [ProjectController::class, 'releaseFilters']);
     Route::get('/projects/{project}/member-candidates', [ProjectController::class, 'memberCandidates']);
