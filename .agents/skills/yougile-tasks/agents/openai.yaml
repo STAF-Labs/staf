@@ -1,0 +1,4 @@
+interface:
+  display_name: "Yougile Tasks"
+  short_description: "Create and update STAF Yougile task markdown files."
+  default_prompt: "Create Yougile tasks for the current STAF work item."
