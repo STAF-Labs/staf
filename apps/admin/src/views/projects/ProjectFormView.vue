@@ -2,6 +2,7 @@
 import {
   ArrowLeft,
   Bold,
+  Building2,
   Clock,
   Columns3,
   Heading2,
@@ -102,6 +103,7 @@ type ProjectMemberCard = {
   status: 'active' | 'invited' | 'suspended'
   avatarUrl: string | null
   createdAt: string | null
+  accessSource: 'project' | 'organization'
 }
 
 type ReleaseSortOption = 'title_asc' | 'title_desc' | 'released_at'
@@ -280,7 +282,7 @@ const visibleProjectReleases = computed(() =>
 )
 const visibleReleaseColumns = computed(() => releaseColumns.value.filter((column) => column.visible))
 const projectAuthorMember = computed(() => {
-  if (!project.value) {
+  if (!project.value || project.value.ownerable_type !== 'App\\Models\\User\\User') {
     return null
   }
 
@@ -292,6 +294,7 @@ const projectAuthorMember = computed(() => {
     status: 'active',
     avatarUrl: null,
     createdAt: project.value.created_at,
+    accessSource: 'project',
   } satisfies ProjectMemberCard
 })
 const projectMemberCards = computed<ProjectMemberCard[]>(() => [
@@ -304,6 +307,7 @@ const projectMemberCards = computed<ProjectMemberCard[]>(() => [
     status: member.status,
     avatarUrl: member.avatar_url,
     createdAt: member.created_at,
+    accessSource: member.access_source,
   })),
 ])
 const visibleProjectMemberCards = computed(() => {
@@ -2442,6 +2446,13 @@ onBeforeUnmount(() => {
                       :stroke-width="2"
                       aria-hidden="true"
                     />
+                    <Building2
+                      v-else-if="member.accessSource === 'organization'"
+                      class="project-member-card__organization"
+                      :size="18"
+                      :stroke-width="2"
+                      aria-hidden="true"
+                    />
                   </span>
                 </header>
 
@@ -2980,6 +2991,11 @@ onBeforeUnmount(() => {
 .project-member-card__invited {
   flex: 0 0 auto;
   color: var(--color-warning);
+}
+
+.project-member-card__organization {
+  flex: 0 0 auto;
+  color: var(--color-primary);
 }
 
 .project-member-card__permissions {

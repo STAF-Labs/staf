@@ -160,11 +160,43 @@ class ProjectController extends Controller
             ->with('user.userProfile.media')
             ->latest('id')
             ->get();
+        $organizationMembers = collect();
+
+        if ($project->ownerable_type === Organization::class) {
+            $organizationMembers = OrganizationMember::query()
+                ->with('member.userProfile.media')
+                ->where('organization_id', $project->ownerable_id)
+                ->where('status', MembershipStatus::ACTIVE)
+                ->whereIn('role', [OrgMemberRole::OWNER, OrgMemberRole::MAINTAINER])
+                ->latest('id')
+                ->get()
+                ->map(fn (OrganizationMember $membership): array => [
+                    'id' => "organization:{$membership->id}",
+                    'project_id' => $project->id,
+                    'user_id' => $membership->user_id,
+                    'username' => $membership->member?->username,
+                    'display_name' => $membership->member?->userProfile?->display_name,
+                    'avatar_url' => $membership->member?->userProfile?->getFirstMediaUrl('avatar') ?: null,
+                    'role' => $membership->role?->value,
+                    'role_label' => $membership->role?->getLabel(),
+                    'role_color' => $membership->role?->getColor(),
+                    'status' => MembershipStatus::ACTIVE->value,
+                    'status_label' => MembershipStatus::ACTIVE->getLabel(),
+                    'status_color' => MembershipStatus::ACTIVE->getColor(),
+                    'created_at' => $membership->created_at?->toISOString(),
+                    'updated_at' => $membership->updated_at?->toISOString(),
+                    'access_source' => 'organization',
+                ]);
+        }
+
+        $data = $organizationMembers
+            ->concat(ProjectMemberResource::collection($members)->resolve($request))
+            ->values();
 
         return response()->json([
-            'data' => ProjectMemberResource::collection($members)->resolve($request),
-            'total' => $members->count(),
-            'filtered_total' => $members->count(),
+            'data' => $data,
+            'total' => $data->count(),
+            'filtered_total' => $data->count(),
         ]);
     }
 
@@ -180,6 +212,17 @@ class ProjectController extends Controller
 
         if ($project->ownerable_type === User::class) {
             $excludedUserIds->push((int) $project->ownerable_id);
+        }
+
+        if ($project->ownerable_type === Organization::class) {
+            OrganizationMember::query()
+                ->where('organization_id', $project->ownerable_id)
+                ->where('status', MembershipStatus::ACTIVE)
+                ->whereIn('role', [OrgMemberRole::OWNER, OrgMemberRole::MAINTAINER])
+                ->pluck('user_id')
+                ->each(function (int $userId) use ($excludedUserIds): void {
+                    $excludedUserIds->push($userId);
+                });
         }
 
         $query = User::query()

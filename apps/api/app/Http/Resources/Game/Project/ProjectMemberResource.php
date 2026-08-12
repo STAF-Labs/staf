@@ -31,6 +31,7 @@ class ProjectMemberResource extends JsonResource
             'status_color' => $this->status?->getColor(),
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
+            'access_source' => 'project',
         ];
     }
 }

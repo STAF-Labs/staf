@@ -14,6 +14,7 @@ export type {
   ProjectDetail,
   ProjectListItem,
   ProjectMember,
+  ProjectMemberAccessSource,
   ProjectMemberCandidate,
   ProjectMemberRole,
   ProjectMemberStatus,

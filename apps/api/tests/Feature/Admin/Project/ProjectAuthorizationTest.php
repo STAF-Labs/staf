@@ -5,10 +5,12 @@ namespace Tests\Feature\Admin\Project;
 use App\Enums\CommonStatus;
 use App\Enums\MembershipStatus;
 use App\Enums\Org\OrgMemberRole;
+use App\Enums\Project\ProjectMemberRole;
 use App\Models\Game\ContentType\ContentType;
 use App\Models\Game\ContentType\GameContentType;
 use App\Models\Game\Game;
 use App\Models\Game\Project\Project;
+use App\Models\Game\Project\ProjectMember;
 use App\Models\Org\Organization;
 use App\Models\Org\OrganizationMember;
 use App\Models\User\User;
@@ -210,6 +212,52 @@ class ProjectAuthorizationTest extends TestCase
         $this->assertSame('Original Project', $project->title);
         $this->assertSame(User::class, $project->ownerable_type);
         $this->assertSame($user->id, $project->ownerable_id);
+    }
+
+    public function test_organization_project_members_include_active_owner_and_maintainer_access(): void
+    {
+        [, $gameContentType] = $this->projectContext();
+        $owner = $this->createUser('project-org-owner');
+        $maintainer = $this->createUser('project-org-maintainer');
+        $member = $this->createUser('project-org-member');
+        $invitedOwner = $this->createUser('project-org-invited-owner');
+        $directMember = $this->createUser('project-direct-member');
+        $organization = $this->createOrganization('Members Organization');
+        $this->createMembership($owner, $organization, OrgMemberRole::OWNER);
+        $this->createMembership($maintainer, $organization, OrgMemberRole::MAINTAINER);
+        $this->createMembership($member, $organization, OrgMemberRole::MEMBER);
+        $this->createMembership($invitedOwner, $organization, OrgMemberRole::OWNER, MembershipStatus::INVITED);
+        $project = Project::query()->create($this->projectAttributes($organization, $gameContentType));
+        ProjectMember::query()->create([
+            'project_id' => $project->id,
+            'user_id' => $directMember->id,
+            'role' => ProjectMemberRole::MEMBER,
+            'status' => MembershipStatus::INVITED,
+        ]);
+
+        $response = $this
+            ->actingAs($owner)
+            ->getJson("/api/projects/{$project->id}/members")
+            ->assertOk()
+            ->assertJsonCount(3, 'data');
+
+        $members = collect($response->json('data'));
+
+        $this->assertSame(
+            ['organization', 'organization', 'project'],
+            $members->pluck('access_source')->all()
+        );
+        $this->assertTrue($members->contains(fn (array $item): bool => $item['user_id'] === $owner->id
+            && $item['role'] === 'owner'
+            && $item['status'] === 'active'));
+        $this->assertTrue($members->contains(fn (array $item): bool => $item['user_id'] === $maintainer->id
+            && $item['role'] === 'maintainer'
+            && $item['status'] === 'active'));
+        $this->assertTrue($members->contains(fn (array $item): bool => $item['user_id'] === $directMember->id
+            && $item['access_source'] === 'project'
+            && $item['status'] === 'invited'));
+        $this->assertFalse($members->contains('user_id', $member->id));
+        $this->assertFalse($members->contains('user_id', $invitedOwner->id));
     }
 
     public function test_personal_project_owner_can_delete_project(): void

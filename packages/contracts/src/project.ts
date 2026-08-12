@@ -10,6 +10,8 @@ export type ProjectMemberRole = 'owner' | 'maintainer' | 'member'
 
 export type ProjectMemberStatus = 'active' | 'invited' | 'suspended'
 
+export type ProjectMemberAccessSource = 'project' | 'organization'
+
 export type ContentTypeListItem = {
   id: number
   name: string
@@ -111,7 +113,7 @@ export type ProjectRelease = {
 }
 
 export type ProjectMember = {
-  id: number
+  id: number | string
   project_id: number
   user_id: number
   username: string | null
@@ -125,6 +127,7 @@ export type ProjectMember = {
   status_color: string | null
   created_at: string | null
   updated_at: string | null
+  access_source: ProjectMemberAccessSource
 }
 
 export type ProjectMemberCandidate = {
