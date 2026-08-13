@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted
+Принято
 
 ## Context
 
