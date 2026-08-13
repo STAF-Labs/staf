@@ -2194,6 +2194,15 @@ onBeforeUnmount(() => {
                 placeholder="Поиск по релизам"
               />
 
+              <RouterLink
+                v-if="projectReleases.length > 0"
+                class="button button-primary project-releases-filters__add"
+                :to="{ name: 'projects.releases.create', params: { id: project.id } }"
+              >
+                <Plus :size="18" :stroke-width="1.9" aria-hidden="true" />
+                <span>Добавить релиз</span>
+              </RouterLink>
+
               <button
                 class="game-filter-advanced"
                 :class="{ 'game-filter-advanced--active': releaseAdvancedFiltersOpen }"
@@ -2774,9 +2783,24 @@ onBeforeUnmount(() => {
 
 .project-releases-filters .game-filter-top {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) auto auto;
+  grid-template-columns: minmax(260px, 1fr) auto auto auto;
   gap: 12px;
   align-items: center;
+}
+
+.project-releases-filters__add {
+  min-height: 40px;
+  gap: 8px;
+  width: fit-content;
+  padding: 0 12px;
+  color: var(--color-primary-text);
+  white-space: nowrap;
+}
+
+.project-releases-filters__add:hover {
+  color: var(--color-primary-text);
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
 }
 
 .project-releases-filters .game-filter-columns {

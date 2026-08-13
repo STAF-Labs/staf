@@ -107,6 +107,7 @@ export type ProjectRelease = {
   status_color: string | null
   file_url: string | null
   file_name: string | null
+  file_size: number | null
   dimension_value_ids?: number[]
   created_at: string | null
   updated_at: string | null

@@ -5,6 +5,7 @@ import { ArrowLeft, Ban, RotateCcw, Snowflake, Trash2 } from '@lucide/vue'
 import AppShell from '@/components/layout/AppShell.vue'
 import BlockModal from '@/components/ui/BlockModal.vue'
 import DeleteModal from '@/components/ui/DeleteModal.vue'
+import RichTextRenderer from '@/components/ui/RichTextRenderer.vue'
 import {
   blockOrganization,
   fetchOrganization,
@@ -372,9 +373,11 @@ onMounted(() => {
                   {{ organization.summary || organization.name }}
                 </h4>
 
-                <p class="profile-about__text">
-                  {{ formatJsonValue(organization.description) }}
-                </p>
+                <RichTextRenderer
+                  class="profile-about__text"
+                  :value="organization.description"
+                  empty-text="Описание организации пока не заполнено."
+                />
               </div>
 
               <div class="profile-info-grid">

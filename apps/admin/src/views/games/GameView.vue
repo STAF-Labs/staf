@@ -15,11 +15,10 @@ import {
 } from '@lucide/vue'
 import { AxiosError } from 'axios'
 import Sortable, { type SortableEvent } from 'sortablejs'
-import StarterKit from '@tiptap/starter-kit'
-import { EditorContent, useEditor } from '@tiptap/vue-3'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AppShell from '@/components/layout/AppShell.vue'
+import RichTextRenderer from '@/components/ui/RichTextRenderer.vue'
 import SearchField from '@/components/ui/SearchField.vue'
 import StepIndicator from '@/components/ui/StepIndicator.vue'
 import { fetchContentTypes, type ContentTypeListItem } from '@/shared/content-types/content-types'
@@ -85,12 +84,6 @@ const selectedCopyFilterIds = ref<number[]>([])
 const isCopyFiltersLoading = ref(false)
 const isCopyingFilters = ref(false)
 const message = ref('')
-
-const editor = useEditor({
-  extensions: [StarterKit],
-  content: '',
-  editable: false,
-})
 
 const title = computed(() => game.value?.name ?? 'Игра')
 const statusClass = computed(() => `game-view-status--${game.value?.status_color ?? 'gray'}`)
@@ -163,6 +156,9 @@ const activeLocalFilter = computed(() => {
 
   return activeLocalFilters.value.find((filter) => filter.id === activeLocalFilterId.value) ?? null
 })
+const activeLocalFilterValues = computed(() =>
+  activeLocalFilter.value ? orderDimensionValuesHierarchically(activeLocalFilter.value.values) : [],
+)
 const canAddFilterValue = computed(() => {
   if (!activeLocalFilter.value) {
     return false
@@ -204,20 +200,6 @@ function formatDate(value: string | null): string {
   }).format(new Date(value))
 }
 
-function setDescription(value: unknown): void {
-  if (!editor.value) {
-    return
-  }
-
-  if (value && typeof value === 'object') {
-    editor.value.commands.setContent(value)
-
-    return
-  }
-
-  editor.value.commands.clearContent()
-}
-
 async function loadGame(): Promise<void> {
   isLoading.value = true
   message.value = ''
@@ -234,7 +216,6 @@ async function loadGame(): Promise<void> {
     gameContentTypes.value = gameContentTypesResponse.data
     contentTypes.value = contentTypesResponse.data
     route.meta.breadcrumbLabel = game.value.name
-    setDescription(game.value.description)
   } catch {
     message.value = 'Не удалось загрузить игру.'
   } finally {
@@ -581,6 +562,7 @@ function initializeFilterValueSortable(): void {
     ghostClass: 'game-content-types-panel__value--ghost',
     chosenClass: 'game-content-types-panel__value--chosen',
     dragClass: 'game-content-types-panel__value--dragging',
+    onMove: (event) => canMoveFilterValue(event.dragged, event.related, event.willInsertAfter ?? false),
     onEnd: (event: SortableEvent) => {
       if (event.oldIndex === undefined || event.newIndex === undefined) {
         return
@@ -601,7 +583,8 @@ async function reorderFilterValues(oldIndex: number, newIndex: number): Promise<
   }
 
   const originalValues = [...activeLocalFilter.value.values]
-  const values = [...originalValues]
+  const visibleValues = orderDimensionValuesHierarchically(originalValues)
+  const values = [...visibleValues]
   const [value] = values.splice(oldIndex, 1)
 
   if (!value || newIndex < 0 || newIndex > values.length) {
@@ -609,13 +592,30 @@ async function reorderFilterValues(oldIndex: number, newIndex: number): Promise<
   }
 
   values.splice(newIndex, 0, value)
-  const reorderedValues = values.map((item, sortOrder) => ({ ...item, sort_order: sortOrder }))
+  const reorderedSiblingIds = values
+    .filter((item) => item.parent_id === value.parent_id)
+    .map((item) => item.id)
+  const reorderedValues = orderDimensionValuesHierarchically(
+    originalValues.map((item) => {
+      if (item.parent_id !== value.parent_id) {
+        return item
+      }
+
+      return { ...item, sort_order: reorderedSiblingIds.indexOf(item.id) }
+    }),
+  )
+  const changedValues = reorderedValues.filter((item) => {
+    const originalValue = originalValues.find((originalItem) => originalItem.id === item.id)
+
+    return originalValue && originalValue.sort_order !== item.sort_order
+  })
+
   pendingFilterValueId.value = value.id
   updateActiveLocalFilter((filter) => ({ ...filter, values: reorderedValues }))
 
   try {
     await Promise.all(
-      reorderedValues.map((item) =>
+      changedValues.map((item) =>
         updateGameDimensionValue(
           game.value!.id,
           activeFiltersGameContentType.value!.id,
@@ -631,6 +631,103 @@ async function reorderFilterValues(oldIndex: number, newIndex: number): Promise<
   } finally {
     pendingFilterValueId.value = null
   }
+}
+
+function orderDimensionValuesHierarchically(values: GameDimensionValue[]): GameDimensionValue[] {
+  const valuesByParentId = new Map<number | null, GameDimensionValue[]>()
+
+  for (const value of values) {
+    const siblings = valuesByParentId.get(value.parent_id) ?? []
+
+    siblings.push(value)
+    valuesByParentId.set(value.parent_id, siblings)
+  }
+
+  for (const siblings of valuesByParentId.values()) {
+    siblings.sort(compareDimensionValueOrder)
+  }
+
+  const orderedValues: GameDimensionValue[] = []
+  const appendValues = (parentId: number | null): void => {
+    for (const value of valuesByParentId.get(parentId) ?? []) {
+      orderedValues.push(value)
+      appendValues(value.id)
+    }
+  }
+
+  appendValues(null)
+
+  return orderedValues
+}
+
+function compareDimensionValueOrder(firstValue: GameDimensionValue, secondValue: GameDimensionValue): number {
+  if (firstValue.sort_order !== secondValue.sort_order) {
+    return firstValue.sort_order - secondValue.sort_order
+  }
+
+  return firstValue.id - secondValue.id
+}
+
+function filterValueDepth(value: GameDimensionValue): number {
+  if (!activeLocalFilter.value) {
+    return 0
+  }
+
+  const valuesById = new Map(activeLocalFilter.value.values.map((item) => [item.id, item]))
+  let depth = 0
+  let parentId = value.parent_id
+
+  while (parentId !== null) {
+    const parent = valuesById.get(parentId)
+
+    if (!parent) {
+      break
+    }
+
+    depth += 1
+    parentId = parent.parent_id
+  }
+
+  return depth
+}
+
+function canMoveFilterValue(
+  draggedElement: HTMLElement,
+  relatedElement: HTMLElement | null,
+  willInsertAfter: boolean,
+): boolean {
+  if (!activeLocalFilter.value || !relatedElement) {
+    return false
+  }
+
+  const draggedValue = filterValueByElement(draggedElement)
+  const relatedValue = filterValueByElement(relatedElement)
+
+  if (!draggedValue || !relatedValue) {
+    return false
+  }
+
+  if (draggedValue.parent_id === relatedValue.parent_id) {
+    return true
+  }
+
+  const siblingElement = willInsertAfter
+    ? relatedElement.nextElementSibling
+    : relatedElement.previousElementSibling
+  const siblingValue =
+    siblingElement instanceof HTMLElement ? filterValueByElement(siblingElement) : null
+
+  return Boolean(siblingValue && siblingValue.parent_id === draggedValue.parent_id)
+}
+
+function filterValueByElement(element: HTMLElement): GameDimensionValue | null {
+  const valueId = Number(element.dataset.valueId)
+
+  if (!Number.isFinite(valueId) || !activeLocalFilter.value) {
+    return null
+  }
+
+  return activeLocalFilter.value.values.find((value) => value.id === valueId) ?? null
 }
 
 function updateActiveLocalFilter(update: (filter: GameDimension) => GameDimension): void {
@@ -823,7 +920,6 @@ function apiErrorMessage(error: unknown, fallback: string): string {
 
 onBeforeUnmount(() => {
   filterValueSortable?.destroy()
-  editor.value?.destroy()
 })
 
 void loadGame()
@@ -888,7 +984,11 @@ void loadGame()
 
           <section class="game-view__section">
             <h3 class="game-view__section-title">Описание</h3>
-            <EditorContent class="game-view-description" :editor="editor" />
+            <RichTextRenderer
+              class="game-view-description"
+              :value="game.description"
+              empty-text="Описание игры пока не заполнено."
+            />
           </section>
 
           <section class="game-view__section game-content-types" aria-label="Типы контента игры">
@@ -1297,10 +1397,12 @@ void loadGame()
 
                     <div v-else ref="filterValueList" class="game-content-types-panel__value-list">
                       <div
-                        v-for="value in activeLocalFilter.values"
+                        v-for="value in activeLocalFilterValues"
                         :key="value.id"
                         class="game-content-types-panel__value"
                         :class="{ 'game-content-types-panel__value--inactive': !value.is_active }"
+                        :data-value-id="value.id"
+                        :style="{ '--value-depth': String(filterValueDepth(value)) }"
                       >
                         <div class="game-content-types-panel__value-main">
                           <button

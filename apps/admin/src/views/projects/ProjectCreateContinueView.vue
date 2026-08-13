@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { ArrowLeft, Save } from '@lucide/vue'
-import StarterKit from '@tiptap/starter-kit'
-import { EditorContent, useEditor } from '@tiptap/vue-3'
-import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppShell from '@/components/layout/AppShell.vue'
 import ProjectCompletionCard from '@/components/ProjectCompletionCard.vue'
+import RichTextRenderer from '@/components/ui/RichTextRenderer.vue'
 import StepIndicator from '@/components/ui/StepIndicator.vue'
 import {
   fetchGame,
@@ -51,17 +50,6 @@ const selectedDimensions = computed(() =>
     .filter((dimension) => dimension.values.length > 0),
 )
 
-const summaryEditor = useEditor({
-  extensions: [StarterKit],
-  content: '',
-  editable: false,
-})
-const descriptionEditor = useEditor({
-  extensions: [StarterKit],
-  content: '',
-  editable: false,
-})
-
 async function loadPreviewContext(): Promise<void> {
   isLoading.value = true
 
@@ -73,16 +61,6 @@ async function loadPreviewContext(): Promise<void> {
     logoPreviewUrl.value = projectCreateDraft.logo
       ? URL.createObjectURL(projectCreateDraft.logo)
       : projectCreateDraft.logoUrl
-
-    await nextTick()
-
-    if (summaryEditor.value && projectCreateDraft.summary) {
-      summaryEditor.value.commands.setContent(projectCreateDraft.summary)
-    }
-
-    if (descriptionEditor.value && projectCreateDraft.description) {
-      descriptionEditor.value.commands.setContent(projectCreateDraft.description)
-    }
 
     const [game, contentTypesResponse, dimensionsResponse] = await Promise.all([
       fetchGame(gameId),
@@ -167,8 +145,6 @@ onBeforeUnmount(() => {
   if (projectCreateDraft.logo && logoPreviewUrl.value) {
     URL.revokeObjectURL(logoPreviewUrl.value)
   }
-  summaryEditor.value?.destroy()
-  descriptionEditor.value?.destroy()
 })
 
 void loadPreviewContext()
@@ -223,7 +199,11 @@ void loadPreviewContext()
 
         <div class="project-confirmation__group">
           <span class="form-label">Краткое описание</span>
-          <EditorContent class="project-confirmation__editor" :editor="summaryEditor" />
+          <RichTextRenderer
+            class="project-confirmation__editor"
+            :value="projectCreateDraft.summary"
+            empty-text="Краткое описание не заполнено."
+          />
         </div>
 
         <div v-if="selectedDimensions.length > 0" class="project-confirmation__group">
@@ -256,7 +236,11 @@ void loadPreviewContext()
 
         <div class="project-confirmation__group">
           <span class="form-label">Описание</span>
-          <EditorContent class="project-confirmation__editor" :editor="descriptionEditor" />
+          <RichTextRenderer
+            class="project-confirmation__editor"
+            :value="projectCreateDraft.description"
+            empty-text="Описание не заполнено."
+          />
         </div>
 
         <div class="project-confirmation__group">

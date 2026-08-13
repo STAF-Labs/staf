@@ -16,6 +16,8 @@ class ProjectReleaseResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $releaseMedia = $this->getFirstMedia('release');
+
         return [
             'id' => $this->id,
             'project_id' => $this->project_id,
@@ -30,7 +32,8 @@ class ProjectReleaseResource extends JsonResource
             'status_label' => $this->status?->getLabel(),
             'status_color' => $this->status?->getColor(),
             'file_url' => $this->getFirstMediaUrl('release') ?: null,
-            'file_name' => $this->getFirstMedia('release')?->file_name,
+            'file_name' => $releaseMedia?->file_name,
+            'file_size' => $releaseMedia?->size,
             'dimension_value_ids' => $this->whenLoaded(
                 'dimensionValues',
                 fn () => $this->dimensionValues->pluck('id')->values()

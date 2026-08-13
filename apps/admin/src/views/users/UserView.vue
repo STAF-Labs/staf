@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AppShell from '@/components/layout/AppShell.vue'
 import BlockModal from '@/components/ui/BlockModal.vue'
 import DeleteModal from '@/components/ui/DeleteModal.vue'
+import RichTextRenderer from '@/components/ui/RichTextRenderer.vue'
 import {
   blockUser,
   fetchUser,
@@ -399,9 +400,11 @@ onMounted(() => {
                     {{ user.profile.display_name || user.username }}
                   </h4>
 
-                  <p class="profile-about__text">
-                    Тут будет описание профиля из TipTap.
-                  </p>
+                  <RichTextRenderer
+                    class="profile-about__text"
+                    :value="user.profile.bio"
+                    empty-text="Описание профиля пока не заполнено."
+                  />
                 </div>
 
                 <div class="profile-info-grid">
