@@ -15,6 +15,7 @@ import {
   type ProjectRelease,
   updateProjectRelease,
 } from '@/shared/projects/projects'
+import { uploadTotalSizeError } from '@/shared/uploads/upload-limits'
 import '@/assets/styles/game-form.css'
 
 type ReleaseForm = {
@@ -124,6 +125,15 @@ function chooseReleaseFile(event: Event): void {
     return
   }
 
+  const uploadError = uploadTotalSizeError([file])
+
+  if (uploadError) {
+    fileError.value = uploadError
+    input.value = ''
+
+    return
+  }
+
   form.file = file
 }
 
@@ -150,6 +160,12 @@ async function submitRelease(): Promise<void> {
 
   if (!form.file && !isEditMode.value) {
     fileError.value = 'Добавьте файл релиза.'
+  }
+
+  const uploadError = uploadTotalSizeError([form.file])
+
+  if (uploadError) {
+    fileError.value = uploadError
   }
 
   if (!form.title.trim()) {
@@ -217,7 +233,10 @@ function releaseFilterValueOptions(dimension: GameDimension): GameDimension['val
   const orderedValues: GameDimension['values'] = []
   const appendValues = (parentId: number | null): void => {
     for (const value of valuesByParentId.get(parentId) ?? []) {
-      orderedValues.push(value)
+      if (!valuesByParentId.has(value.id)) {
+        orderedValues.push(value)
+      }
+
       appendValues(value.id)
     }
   }

@@ -39,6 +39,7 @@ import {
   saveProjectDetails,
   type ProjectOwnerOption,
 } from '@/shared/projects/projects'
+import { uploadTotalSizeError } from '@/shared/uploads/upload-limits'
 import '@/assets/styles/game-form.css'
 
 const imageMimeTypes = ['image/jpeg', 'image/png', 'image/webp']
@@ -505,6 +506,12 @@ async function continueToNextStep(): Promise<void> {
 
   if (!form.logo && !form.logoUrl) {
     logoError.value = 'Логотип обязателен.'
+  }
+
+  const uploadError = uploadTotalSizeError([form.logo])
+
+  if (uploadError) {
+    logoError.value = uploadError
   }
 
   if (!editor || editor.isEmpty) {
