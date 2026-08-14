@@ -58,6 +58,7 @@ import {
   type ProjectRelease,
   type ProjectScreenshot,
 } from '@/shared/projects/projects'
+import { uploadTotalSizeError } from '@/shared/uploads/upload-limits'
 import '@/assets/styles/game-form.css'
 
 type ProjectMainForm = {
@@ -80,6 +81,16 @@ type ProjectMainForm = {
   tagInput: string
   tags: string[]
   websiteUrls: string[]
+}
+
+type ProjectMainSnapshot = {
+  gameContentTypeId: number | null
+  title: string
+  logo: string | null
+  summary: string
+  tags: string[]
+  websiteUrls: string[]
+  dimensionValueIds: number[]
 }
 
 type ReleaseFilterState = {
@@ -223,6 +234,9 @@ const websiteUrlInputs = ref<HTMLInputElement[]>([])
 let memberCandidateSearchTimer: ReturnType<typeof window.setTimeout> | null = null
 const projectId = computed(() => Number(route.params.id))
 let ignoreNextMemberSearchChange = false
+const mainTabBaseline = ref<ProjectMainSnapshot | null>(null)
+const descriptionTabBaseline = ref('')
+const licenceTabBaseline = ref('')
 const form = reactive<ProjectMainForm>({
   ownerableType: '',
   ownerableId: null,
@@ -281,6 +295,16 @@ const visibleProjectReleases = computed(() =>
   sortedProjectReleases.value.slice(0, releasePageSize.value),
 )
 const visibleReleaseColumns = computed(() => releaseColumns.value.filter((column) => column.visible))
+const hasMainTabChanges = computed(() =>
+  mainTabBaseline.value !== null &&
+    snapshotKey(createMainTabSnapshot()) !== snapshotKey(mainTabBaseline.value),
+)
+const hasDescriptionTabChanges = computed(() =>
+  descriptionTabBaseline.value !== richTextKey(form.description),
+)
+const hasLicenceTabChanges = computed(() =>
+  licenceTabBaseline.value !== normalizeLicenceName(form.licenceName),
+)
 const projectAuthorMember = computed(() => {
   if (!project.value || project.value.ownerable_type !== 'App\\Models\\User\\User') {
     return null
@@ -348,6 +372,54 @@ const descriptionEditor = useEditor({
   },
 })
 
+function snapshotKey(snapshot: ProjectMainSnapshot): string {
+  return JSON.stringify(snapshot)
+}
+
+function richTextKey(value: unknown): string {
+  return JSON.stringify(value ?? null)
+}
+
+function normalizeLicenceName(value: string): string {
+  return value || ''
+}
+
+function createMainTabSnapshot(): ProjectMainSnapshot {
+  return {
+    gameContentTypeId: form.gameContentTypeId,
+    title: form.title.trim(),
+    logo: form.logo ? fileSnapshotKey(form.logo) : form.logoUrl,
+    summary: richTextKey(form.summary),
+    tags: [...form.tags],
+    websiteUrls: form.websiteUrls.filter(Boolean),
+    dimensionValueIds: [...new Set(Object.values(form.dimensionValueIds).flat())]
+      .map((valueId) => Number(valueId))
+      .sort((firstValueId, secondValueId) => firstValueId - secondValueId),
+  }
+}
+
+function fileSnapshotKey(file: File): string {
+  return `${file.name}:${file.type}:${file.size}:${file.lastModified}`
+}
+
+function setMainTabBaseline(): void {
+  mainTabBaseline.value = createMainTabSnapshot()
+}
+
+function setDescriptionTabBaseline(): void {
+  descriptionTabBaseline.value = richTextKey(form.description)
+}
+
+function setLicenceTabBaseline(): void {
+  licenceTabBaseline.value = normalizeLicenceName(form.licenceName)
+}
+
+function setProjectEditBaselines(): void {
+  setMainTabBaseline()
+  setDescriptionTabBaseline()
+  setLicenceTabBaseline()
+}
+
 function optionKey(option: ProjectOwnerOption): string {
   return `${option.type}:${option.id}`
 }
@@ -392,6 +464,8 @@ async function loadProject(): Promise<void> {
       descriptionEditor.value.commands.setContent(form.description)
       form.descriptionFilled = !descriptionEditor.value.isEmpty
     }
+
+    setProjectEditBaselines()
   } catch {
     messageKind.value = 'error'
     message.value = 'Не удалось загрузить проект.'
@@ -445,6 +519,15 @@ async function chooseScreenshots(event: Event): Promise<void> {
 
   if (files.length > screenshotsMaxCount) {
     screenshotsError.value = `За один раз можно добавить не больше ${screenshotsMaxCount} файлов.`
+    input.value = ''
+
+    return
+  }
+
+  const uploadError = uploadTotalSizeError(files)
+
+  if (uploadError) {
+    screenshotsError.value = uploadError
     input.value = ''
 
     return
@@ -509,6 +592,14 @@ async function saveScreenshotsTab(): Promise<void> {
 
   if (selectedScreenshotFiles.value.length === 0) {
     screenshotsError.value = 'Выберите скриншоты для добавления.'
+
+    return
+  }
+
+  const uploadError = uploadTotalSizeError(selectedScreenshotFiles.value)
+
+  if (uploadError) {
+    screenshotsError.value = uploadError
 
     return
   }
@@ -653,6 +744,10 @@ async function loadLicences(): Promise<void> {
 }
 
 async function saveDescriptionTab(): Promise<void> {
+  if (!hasDescriptionTabChanges.value) {
+    return
+  }
+
   const editor = descriptionEditor.value
   descriptionError.value = ''
 
@@ -678,6 +773,9 @@ async function saveDescriptionTab(): Promise<void> {
     })
 
     project.value = updatedProject
+    form.description = updatedProject.description
+    form.descriptionFilled = richTextIsFilled(updatedProject.description)
+    setDescriptionTabBaseline()
     messageKind.value = 'success'
     message.value = 'Описание сохранено.'
   } catch {
@@ -689,6 +787,10 @@ async function saveDescriptionTab(): Promise<void> {
 }
 
 async function saveLicenceTab(): Promise<void> {
+  if (!hasLicenceTabChanges.value) {
+    return
+  }
+
   if (!project.value) {
     return
   }
@@ -704,6 +806,7 @@ async function saveLicenceTab(): Promise<void> {
 
     project.value = updatedProject
     form.licenceName = updatedProject.licence_name ?? ''
+    setLicenceTabBaseline()
     messageKind.value = 'success'
     message.value = 'Лицензия сохранена.'
   } catch {
@@ -1120,6 +1223,23 @@ function selectedDimensionValues(dimensionId: number): number[] {
   return form.dimensionValueIds[dimensionId] ?? []
 }
 
+function selectedDimensionValueIdsByDimension(valueIds: number[]): Record<number, number[]> {
+  const selectedValueIds = new Set(valueIds)
+  const dimensionValueIds: Record<number, number[]> = {}
+
+  for (const dimension of projectDimensions.value) {
+    const dimensionSelectedValueIds = dimension.values
+      .filter((value) => selectedValueIds.has(value.id))
+      .map((value) => value.id)
+
+    if (dimensionSelectedValueIds.length > 0) {
+      dimensionValueIds[dimension.id] = dimensionSelectedValueIds
+    }
+  }
+
+  return dimensionValueIds
+}
+
 function dimensionSelectLevels(dimension: GameDimension): GameDimension['values'][] {
   const levels: GameDimension['values'][] = [
     dimension.values.filter((value) => value.parent_id === null),
@@ -1365,6 +1485,10 @@ function removeTag(tag: string): void {
 }
 
 async function saveMainTab(): Promise<void> {
+  if (!hasMainTabChanges.value) {
+    return
+  }
+
   const editor = summaryEditor.value
 
   titleError.value = ''
@@ -1379,6 +1503,12 @@ async function saveMainTab(): Promise<void> {
 
   if (!form.logo && !form.logoUrl) {
     logoError.value = 'Логотип обязателен.'
+  }
+
+  const uploadError = uploadTotalSizeError([form.logo])
+
+  if (uploadError) {
+    logoError.value = uploadError
   }
 
   if (!editor || editor.isEmpty) {
@@ -1430,7 +1560,15 @@ async function saveMainTab(): Promise<void> {
     project.value = updatedProject
     form.logo = null
     form.logoUrl = updatedProject.logo_url
+    form.summary = updatedProject.summary
+    form.tags = normalizeStringArray(updatedProject.tags)
+    form.websiteUrls = normalizeStringArray(updatedProject.website_urls)
+    form.dimensionValueIds = selectedDimensionValueIdsByDimension(
+      updatedProject.dimension_value_ids ?? [],
+    )
+    initializeDimensionPaths()
     setLogoPreview(updatedProject.logo_url)
+    setMainTabBaseline()
     messageKind.value = 'success'
     message.value = 'Основное сохранено.'
 
@@ -1940,7 +2078,7 @@ onBeforeUnmount(() => {
               <span>Назад</span>
             </RouterLink>
 
-            <button class="button button-primary" type="submit" :disabled="isSaving">
+            <button class="button button-primary" type="submit" :disabled="isSaving || !hasMainTabChanges">
               <Save :size="18" :stroke-width="1.9" aria-hidden="true" />
               <span>{{ isSaving ? 'Сохранение...' : 'Сохранить' }}</span>
             </button>
@@ -2022,7 +2160,7 @@ onBeforeUnmount(() => {
               <span>Назад</span>
             </RouterLink>
 
-            <button class="button button-primary" type="submit" :disabled="isSaving">
+            <button class="button button-primary" type="submit" :disabled="isSaving || !hasDescriptionTabChanges">
               <Save :size="18" :stroke-width="1.9" aria-hidden="true" />
               <span>{{ isSaving ? 'Сохранение...' : 'Сохранить' }}</span>
             </button>
@@ -2088,7 +2226,7 @@ onBeforeUnmount(() => {
               <span>Назад</span>
             </RouterLink>
 
-            <button class="button button-primary" type="submit" :disabled="isSaving">
+            <button class="button button-primary" type="submit" :disabled="isSaving || !hasLicenceTabChanges">
               <Save :size="18" :stroke-width="1.9" aria-hidden="true" />
               <span>{{ isSaving ? 'Сохранение...' : 'Сохранить' }}</span>
             </button>
