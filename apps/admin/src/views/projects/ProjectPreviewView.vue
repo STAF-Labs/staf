@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  Activity,
   ArrowLeft,
   Box,
   CalendarDays,
@@ -17,23 +18,29 @@ import {
   Pencil,
   RotateCcw,
   Tag,
+  Copy,
+  Trash2,
   UserRound,
 } from '@lucide/vue'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppShell from '@/components/layout/AppShell.vue'
+import DeleteModal from '@/components/ui/DeleteModal.vue'
 import OverflowBadgeRow from '@/components/ui/OverflowBadgeRow.vue'
 import RichTextRenderer from '@/components/ui/RichTextRenderer.vue'
 import SearchField from '@/components/ui/SearchField.vue'
 import type { DataColumn } from '@/shared/data/table'
 import { fetchGameDimensions, type GameDimension } from '@/shared/games/games'
 import {
+  deleteProject as removeProject,
   fetchProject,
   fetchProjectMembers,
   fetchProjectReleases,
   fetchProjectReleaseFilters,
+  updateProjectDraft,
   type ProjectDetail,
   type ProjectMember,
+  type ProjectPublicationStatus,
   type ProjectRelease,
 } from '@/shared/projects/projects'
 import ProjectReleasesTable from '@/views/projects/components/ProjectReleasesTable.vue'
@@ -69,6 +76,9 @@ const isLoading = ref(true)
 const projectReleasesLoading = ref(false)
 const errorMessage = ref('')
 const projectReleasesError = ref('')
+const isDeleteModalOpen = ref(false)
+const isDeletingProject = ref(false)
+const deleteProjectError = ref('')
 
 const projectId = computed(() => String(route.params.id))
 const summaryText = computed(() => richTextToPlainText(project.value?.summary))
@@ -94,6 +104,8 @@ const projectScreenshots = computed(() => {
 })
 const activeTab = ref<'overview' | 'releases' | 'screenshots'>('overview')
 const isMoreOpen = ref(false)
+const isPublicationStatusSaving = ref(false)
+const publicationStatusError = ref('')
 const releaseCurrentPage = ref(1)
 const releasePageSize = 10
 const releaseFilterState = reactive<ReleaseFilterState>({
@@ -116,6 +128,16 @@ const releaseTypeOptions = [
   { value: 'beta', label: 'Бета' },
   { value: 'release', label: 'Релиз' },
 ] as const
+const publicationStatusOptions: Array<{
+  value: ProjectPublicationStatus
+  label: string
+  description: string
+}> = [
+  { value: 'public', label: 'Публичный', description: 'Проект доступен всем пользователям.' },
+  { value: 'private', label: 'Приватный', description: 'Проект виден только вам и участникам команды.' },
+  { value: 'url_only', label: 'Только по ссылке', description: 'Проект доступен только пользователям с прямой ссылкой.' },
+  { value: 'archived', label: 'В архиве', description: 'Проект скрыт из обычных списков и сохранён в архиве.' },
+]
 const hasActiveReleaseFilters = computed(() =>
   Boolean(
     releaseFilterState.search.trim() ||
@@ -228,6 +250,14 @@ const releaseVisiblePages = computed(() => {
 
   return Array.from({ length: lastPage - firstPage + 1 }, (_, index) => firstPage + index)
 })
+const publicationStatusDescription = computed(() => {
+  return publicationStatusOptions.find((option) => option.value === project.value?.publication_status)?.description ?? ''
+})
+const deleteModalDescription = computed(() => {
+  const title = project.value?.title ?? 'проект'
+
+  return `Проект «${title}», его релизы и файлы будут удалены без возможности восстановления.`
+})
 
 function richTextToPlainText(value: unknown): string {
   if (Array.isArray(value)) {
@@ -330,6 +360,24 @@ function goBack(): void {
 
 function toggleMoreMenu(): void {
   isMoreOpen.value = !isMoreOpen.value
+}
+
+function openDeleteModal(): void {
+  if (!project.value?.can_delete) {
+    return
+  }
+
+  isMoreOpen.value = false
+  deleteProjectError.value = ''
+  isDeleteModalOpen.value = true
+}
+
+function closeDeleteModal(): void {
+  if (isDeletingProject.value) {
+    return
+  }
+
+  isDeleteModalOpen.value = false
 }
 
 function toggleReleaseColumn(key: string): void {
@@ -540,6 +588,52 @@ async function copyProjectLink(): Promise<void> {
   isMoreOpen.value = false
 }
 
+async function changePublicationStatus(event: Event): Promise<void> {
+  if (!project.value) {
+    return
+  }
+
+  const select = event.target as HTMLSelectElement
+  const previousStatus = project.value.publication_status
+  const nextStatus = select.value as ProjectPublicationStatus
+
+  isPublicationStatusSaving.value = true
+  publicationStatusError.value = ''
+
+  try {
+    const updatedProject = await updateProjectDraft(project.value.id, {
+      percentageComplete: project.value.percentage_complete,
+      publicationStatus: nextStatus,
+    })
+
+    project.value = updatedProject
+  } catch {
+    select.value = previousStatus
+    publicationStatusError.value = 'Не удалось изменить статус.'
+  } finally {
+    isPublicationStatusSaving.value = false
+  }
+}
+
+async function confirmDeleteProject(): Promise<void> {
+  if (!project.value) {
+    return
+  }
+
+  isDeletingProject.value = true
+  deleteProjectError.value = ''
+
+  try {
+    await removeProject(project.value.id)
+    await router.push({ name: 'projects.index' })
+  } catch {
+    deleteProjectError.value = 'Не удалось удалить проект.'
+  } finally {
+    isDeletingProject.value = false
+    isDeleteModalOpen.value = false
+  }
+}
+
 onMounted(() => {
   void loadProject()
 })
@@ -610,14 +704,24 @@ onMounted(() => {
               </button>
               <div v-if="isMoreOpen" class="project-preview__more-menu" role="menu">
                 <button type="button" role="menuitem" @click="copyProjectLink">
+                  <Copy :size="15" aria-hidden="true"/>
                   Скопировать ссылку
                 </button>
-                <button type="button" role="menuitem" @click="isMoreOpen = false">
-                  Сменить статус
+                <button
+                  v-if="project.can_delete"
+                  class="project-preview__more-menu-danger"
+                  type="button"
+                  role="menuitem"
+                  :disabled="isDeletingProject"
+                  @click="openDeleteModal"
+                >
+                  <Trash2 :size="15" aria-hidden="true" />
+                  <span>Удалить</span>
                 </button>
               </div>
             </div>
           </div>
+          <p v-if="deleteProjectError" class="project-preview__action-error">{{ deleteProjectError }}</p>
         </header>
 
         <section class="project-preview__hero">
@@ -933,6 +1037,24 @@ onMounted(() => {
           </main>
 
           <aside class="project-preview__aside">
+            <section class="project-preview__card project-preview__card--status">
+              <h2><Activity :size="18" aria-hidden="true" />Статус проекта</h2>
+              <label class="project-preview__status-select">
+                <select
+                  :value="project.publication_status"
+                  aria-label="Статус публикации"
+                  :disabled="isPublicationStatusSaving"
+                  @change="changePublicationStatus"
+                >
+                  <option v-for="option in publicationStatusOptions" :key="option.value" :value="option.value">
+                    {{ option.label }}
+                  </option>
+                </select>
+              </label>
+              <p class="project-preview__status-description">{{ publicationStatusDescription }}</p>
+              <p v-if="publicationStatusError" class="project-preview__status-error">{{ publicationStatusError }}</p>
+            </section>
+
             <section class="project-preview__card">
               <h2><Tag :size="18" aria-hidden="true" />Подробности</h2>
               <dl class="project-preview__details project-preview__details--aside">
@@ -990,6 +1112,15 @@ onMounted(() => {
 
       </template>
     </section>
+
+    <DeleteModal
+      :open="isDeleteModalOpen"
+      title="Удалить проект"
+      :description="deleteModalDescription"
+      :loading="isDeletingProject"
+      @cancel="closeDeleteModal"
+      @confirm="confirmDeleteProject"
+    />
   </AppShell>
 </template>
 
@@ -1075,8 +1206,11 @@ onMounted(() => {
 .project-preview__more-chevron { transition: transform 160ms ease; }
 .project-preview__more-chevron--open { transform: rotate(180deg); }
 .project-preview__more-menu { position: absolute; top: calc(100% + 8px); right: 0; z-index: 5; min-width: 190px; padding: 5px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
-.project-preview__more-menu button { display: block; width: 100%; padding: 9px 10px; color: var(--color-text); background: transparent; border: 0; border-radius: var(--radius-sm); cursor: pointer; text-align: left; font: inherit; font-size: 13px; }
+.project-preview__more-menu button { display: flex; width: 100%; gap: 8px; align-items: center; padding: 9px 10px; color: var(--color-text); background: transparent; border: 0; border-radius: var(--radius-sm); cursor: pointer; text-align: left; font: inherit; font-size: 13px; }
 .project-preview__more-menu button:hover { background: var(--color-surface-hover); }
+.project-preview__more-menu button:disabled { cursor: wait; opacity: .6; }
+.project-preview__more-menu-danger { color: var(--color-danger) !important; }
+.project-preview__action-error { margin: 8px 0 0; color: var(--color-danger); font-size: 13px; }
 .project-preview__tab-placeholder { min-height: 180px; padding: 24px; background: var(--color-surface); border: 1px solid var(--color-border-soft); border-radius: var(--radius-lg); }
 .project-preview__tab-placeholder h2 { margin: 0 0 8px; }
 .project-preview__tab-placeholder p { margin: 0; color: var(--color-text-muted); }
@@ -1119,6 +1253,12 @@ onMounted(() => {
 .project-preview__details dd { min-width: 0; overflow-wrap: anywhere; }
 .project-preview__details--aside div { grid-template-columns: minmax(70px, .7fr) minmax(0, 1.3fr); }
 .project-preview__details--aside dd { text-align: right; }
+.project-preview__card--status { display: grid; gap: 12px; }
+.project-preview__card--status h2 { margin-bottom: 0; }
+.project-preview__status-select select { width: 220px; max-width: 100%; min-height: 38px; padding: 0 10px; color: var(--color-text); background: var(--color-bg-soft); border: 1px solid var(--color-border); border-radius: var(--radius-md); font: inherit; }
+.project-preview__status-select select:focus { border-color: var(--color-primary); outline: 2px solid color-mix(in srgb, var(--color-focus) 25%, transparent); outline-offset: 1px; }
+.project-preview__status-description, .project-preview__status-error { margin: 0; color: var(--color-text-muted); font-size: 13px; line-height: 1.45; }
+.project-preview__status-error { color: var(--color-danger); }
 .project-preview__filter-card { display: grid; gap: 10px; }
 .project-preview__filter-card h2 { margin-bottom: 0; }
 .project-preview__links { display: grid; gap: 10px; }
