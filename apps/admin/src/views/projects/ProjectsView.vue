@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import type { RouteLocationRaw } from 'vue-router'
-import { Pencil, PlayCircle, Plus, RotateCcw, SlidersHorizontal, Trash2 } from '@lucide/vue'
+import { Calendar, Image, Pencil, PlayCircle, Plus, RotateCcw, SlidersHorizontal, Trash2 } from '@lucide/vue'
 import AppShell from '@/components/layout/AppShell.vue'
 import DeleteModal from '@/components/ui/DeleteModal.vue'
 import SearchField from '@/components/ui/SearchField.vue'
@@ -15,6 +15,7 @@ import {
 
 type StatusFilter = ProjectStatus | 'all'
 type SortOption = 'title_asc' | 'title_desc' | 'released_at'
+type DisplayMode = 'cards' | 'list'
 
 const statusFilterOptions: Array<{ value: StatusFilter; label: string }> = [
   { value: 'all', label: 'Все статусы' },
@@ -39,6 +40,7 @@ const releaseDateTo = ref('')
 const statusFilter = ref<StatusFilter>('all')
 const sort = ref<SortOption>('title_asc')
 const pageSize = ref(20)
+const displayMode = ref<DisplayMode>('cards')
 const advancedFiltersOpen = ref(false)
 const message = ref('')
 const isLoading = ref(false)
@@ -233,6 +235,10 @@ function toggleAdvancedFilters(): void {
   advancedFiltersOpen.value = !advancedFiltersOpen.value
 }
 
+function toggleDisplayMode(): void {
+  displayMode.value = displayMode.value === 'cards' ? 'list' : 'cards'
+}
+
 async function loadProjects(): Promise<void> {
   isLoading.value = true
   message.value = ''
@@ -359,6 +365,17 @@ onMounted(() => {
           </label>
 
           <button
+            class="project-display-mode"
+            type="button"
+            :aria-pressed="displayMode === 'list'"
+            :title="displayMode === 'cards' ? 'Показать списком' : 'Показать карточками'"
+            :aria-label="displayMode === 'cards' ? 'Показать списком' : 'Показать карточками'"
+            @click="toggleDisplayMode"
+          >
+            <Image :size="18" :stroke-width="1.9" aria-hidden="true" />
+          </button>
+
+          <button
             class="game-filter-reset"
             type="button"
             :disabled="!hasActiveFilters"
@@ -375,7 +392,11 @@ onMounted(() => {
         class="game-results-layout"
         :class="{ 'game-results-layout--with-panel': advancedFiltersOpen }"
       >
-        <div class="project-card-grid" aria-label="Список проектов">
+        <div
+          class="project-card-grid"
+          :class="{ 'project-card-grid--list': displayMode === 'list' }"
+          aria-label="Список проектов"
+        >
           <RouterLink
             class="project-card project-card--add"
             :to="{ name: 'projects.create' }"
@@ -438,6 +459,10 @@ onMounted(() => {
             <div class="project-card__actions" aria-label="Действия проекта">
               <span class="project-card__status" :class="projectStatusClass(project)">
                 {{ project.status_label ?? project.status ?? 'Статус не указан' }}
+              </span>
+              <span class="project-card__updated-at project-card__updated-at--actions">
+                <span>{{ projectUpdatedAt(project) }}</span>
+                <Calendar :size="14" :stroke-width="1.9" aria-hidden="true" />
               </span>
 
               <RouterLink
@@ -510,6 +535,43 @@ onMounted(() => {
 </template>
 
 <style scoped>
+.game-filter-row--projects .game-filter-reset {
+  margin-left: auto;
+}
+
+.project-display-mode {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  align-self: end;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.project-display-mode:hover {
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+}
+
+.project-display-mode[aria-pressed='true'] {
+  color: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-primary) 48%, var(--color-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+.project-card-grid--list {
+  display: grid;
+  grid-template-columns: minmax(0, 1600px);
+  gap: 10px;
+  align-items: start;
+  justify-content: start;
+}
+
 .project-card:not(.project-card--add, .project-card--loading) {
   min-height: 0;
   aspect-ratio: auto;
@@ -706,5 +768,131 @@ onMounted(() => {
   font-size: 12px;
   line-height: 1.25;
   white-space: nowrap;
+}
+
+.project-card__updated-at--actions {
+  display: none;
+}
+
+.project-card-grid--list .project-card:not(.project-card--add, .project-card--loading) {
+  min-height: 128px;
+}
+
+.project-card-grid--list .project-card:not(.project-card--add, .project-card--loading):hover,
+.project-card-grid--list .project-card:not(.project-card--add, .project-card--loading):focus-within {
+  transform: translateY(-1px);
+}
+
+.project-card-grid--list .project-card--add {
+  grid-template-rows: none;
+  width: auto;
+  min-height: 76px;
+}
+
+.project-card-grid--list .project-card--add .project-card__add-media {
+  aspect-ratio: auto;
+  min-height: 76px;
+}
+
+.project-card-grid--list .project-card__link {
+  min-height: 128px;
+  grid-template-columns: 132px minmax(0, 1fr);
+  grid-template-rows: none;
+}
+
+.project-card-grid--list .project-card__media {
+  width: 132px;
+  min-height: 100%;
+  aspect-ratio: auto;
+  padding: 10px;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border-soft);
+  border-bottom: 0;
+}
+
+.project-card-grid--list .project-card__image {
+  border-radius: var(--radius-md);
+}
+
+.project-card-grid--list .project-card__placeholder {
+  width: 54px;
+  height: 54px;
+  font-size: 24px;
+}
+
+.project-card-grid--list .project-card__body {
+  min-height: 128px;
+  padding: 14px 310px 14px 18px;
+}
+
+.project-card-grid--list .project-card__heading {
+  padding-right: 16px;
+}
+
+.project-card-grid--list .project-card__title {
+  font-size: 18px;
+}
+
+.project-card-grid--list .project-card__summary {
+  max-width: 780px;
+  font-size: 14px;
+  -webkit-line-clamp: 2;
+}
+
+.project-card-grid--list .project-card__badges {
+  min-height: 24px;
+}
+
+.project-card-grid--list .project-card__badge {
+  min-height: 22px;
+  padding: 2px 8px;
+}
+
+.project-card-grid--list .project-card__footer {
+  display: none;
+}
+
+.project-card-grid--list .project-card__updated-at--actions {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 9px;
+  background: color-mix(in srgb, var(--color-surface) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  font-weight: 700;
+}
+
+.project-card-grid--list .project-card__actions {
+  top: 12px;
+  right: 12px;
+  max-width: 320px;
+}
+
+@media (max-width: 860px) {
+  .project-card-grid--list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .project-card-grid--list .project-card__link {
+    grid-template-columns: 104px minmax(0, 1fr);
+  }
+
+  .project-card-grid--list .project-card__media {
+    width: 104px;
+  }
+
+  .project-card-grid--list .project-card__body {
+    padding-right: 16px;
+  }
+
+  .project-card-grid--list .project-card__actions {
+    position: static;
+    padding: 0 12px 12px;
+    justify-content: flex-end;
+    max-width: none;
+  }
 }
 </style>
