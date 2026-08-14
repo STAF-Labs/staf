@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin\Project\Concerns;
 
 use App\Models\Game\Filter\Dimension;
+use App\Models\Game\Filter\DimensionValue;
 use App\Models\Game\Project\Project;
 use Illuminate\Validation\Validator;
 
@@ -74,6 +75,18 @@ trait ValidatesProjectReleaseDimensions
                     "Для фильтра {$dimension->name} можно выбрать только одно значение."
                 );
             }
+        }
+
+        $parentValueNames = DimensionValue::query()
+            ->whereIn('id', $selectedValueIds)
+            ->whereHas('children', fn ($query) => $query->where('is_active', true))
+            ->pluck('name');
+
+        if ($parentValueNames->isNotEmpty()) {
+            $validator->errors()->add(
+                'dimension_value_ids',
+                'Выбирайте только конечные значения фильтров релиза: '.$parentValueNames->join(', ').'.'
+            );
         }
     }
 }

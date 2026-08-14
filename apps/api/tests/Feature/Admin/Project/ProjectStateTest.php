@@ -7,8 +7,10 @@ use App\Enums\Project\ProjectPublicationStatus;
 use App\Enums\Project\ProjectStatus;
 use App\Models\Game\ContentType\ContentType;
 use App\Models\Game\ContentType\GameContentType;
+use App\Models\Game\Filter\Dimension;
 use App\Models\Game\Game;
 use App\Models\Game\Project\Project;
+use App\Models\Game\Project\ProjectRelease;
 use App\Models\User\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -45,6 +47,7 @@ class ProjectStateTest extends TestCase
                 'percentage_complete' => 83,
                 'publication_status' => 'public',
                 'status' => 'published',
+                'summary' => $this->filledDocument('Краткое описание проекта.'),
                 'logo' => UploadedFile::fake()->image('logo.png', 512, 512),
             ]);
 
@@ -148,6 +151,113 @@ class ProjectStateTest extends TestCase
             ]);
     }
 
+    public function test_project_must_be_ready_before_publication(): void
+    {
+        [$user, $gameContentType] = $this->projectContext();
+        $project = Project::query()->create($this->projectPayload($user, $gameContentType));
+        $dimension = Dimension::query()->create([
+            'game_content_type_id' => $gameContentType->id,
+            'name' => 'Категория',
+            'selection_mode' => 'single',
+            'applies_to' => 'project',
+            'is_filterable' => true,
+            'is_required' => true,
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
+        $dimension->values()->create([
+            'name' => 'Приключения',
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->patchJson("/api/projects/{$project->id}", [
+                'status' => 'published',
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors([
+                'logo',
+                'summary',
+                'description',
+                'dimension_value_ids',
+            ]);
+    }
+
+    public function test_project_can_be_published_without_optional_catalogue_fields_or_releases(): void
+    {
+        Storage::fake('public');
+
+        [$user, $gameContentType] = $this->projectContext();
+        $dimension = Dimension::query()->create([
+            'game_content_type_id' => $gameContentType->id,
+            'name' => 'Категория',
+            'selection_mode' => 'single',
+            'applies_to' => 'project',
+            'is_filterable' => true,
+            'is_required' => true,
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
+        $value = $dimension->values()->create([
+            'name' => 'Приключения',
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+        $project = Project::query()->create([
+            ...$this->projectPayload($user, $gameContentType),
+            'summary' => $this->filledDocument('Краткое описание проекта.'),
+            'description' => $this->filledDocument('Подробное описание проекта.'),
+        ]);
+        $project->addMedia(UploadedFile::fake()->image('logo.png', 512, 512))
+            ->toMediaCollection('logo');
+        $project->dimensionValues()->sync([$value->id]);
+
+        $this
+            ->actingAs($user)
+            ->patchJson("/api/projects/{$project->id}", [
+                'status' => 'published',
+                'publication_status' => 'public',
+                'website_urls' => [],
+                'tags' => [],
+                'licence_name' => null,
+            ])
+            ->assertOk()
+            ->assertJsonPath('status', 'published')
+            ->assertJsonPath('publication_status', 'public');
+
+        $this->assertSame(ProjectStatus::PUBLISHED, $project->refresh()->status);
+        $this->assertSame(0, $project->releases()->count());
+    }
+
+    public function test_project_with_releases_cannot_be_moved_to_unpublished_status(): void
+    {
+        [$user, $gameContentType] = $this->projectContext();
+        $project = Project::query()->create([
+            ...$this->projectPayload($user, $gameContentType),
+            'status' => 'published',
+        ]);
+        ProjectRelease::query()->create([
+            'project_id' => $project->id,
+            'title' => '1.0.0',
+            'slug' => '1-0-0',
+            'type' => 'release',
+            'status' => 'on_moderation',
+            'changelog' => $this->filledDocument('Первый релиз.'),
+            'released_at' => today(),
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->patchJson("/api/projects/{$project->id}", [
+                'status' => 'draft',
+            ])
+            ->assertConflict();
+
+        $this->assertSame(ProjectStatus::PUBLISHED, $project->refresh()->status);
+    }
+
     public function test_project_index_includes_owner_name_and_updated_date(): void
     {
         [$user, $gameContentType] = $this->projectContext();
@@ -222,6 +332,24 @@ class ProjectStateTest extends TestCase
             'ownerable_id' => $user->id,
             'game_content_type_id' => $gameContentType->id,
             'title' => 'State Project',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function filledDocument(string $text): array
+    {
+        return [
+            'type' => 'doc',
+            'content' => [
+                [
+                    'type' => 'paragraph',
+                    'content' => [
+                        ['type' => 'text', 'text' => $text],
+                    ],
+                ],
+            ],
         ];
     }
 }

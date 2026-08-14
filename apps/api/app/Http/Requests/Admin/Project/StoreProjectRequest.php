@@ -3,10 +3,12 @@
 namespace App\Http\Requests\Admin\Project;
 
 use App\Models\Game\Filter\Dimension;
+use App\Models\Game\Filter\DimensionValue;
 use App\Models\Org\Organization;
 use App\Models\User\User;
 use App\Rules\FilledTipTapDocument;
 use App\Services\Admin\Licence\SpdxLicenceCatalog;
+use App\Services\Admin\Project\ProjectUploadLimits;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -107,6 +109,9 @@ class StoreProjectRequest extends FormRequest
             function (Validator $validator): void {
                 $this->validateProjectDimensionValues($validator);
             },
+            function (Validator $validator): void {
+                $this->validateUploadTotalSize($validator);
+            },
         ];
     }
 
@@ -176,6 +181,27 @@ class StoreProjectRequest extends FormRequest
                     "Для настройки {$dimension->name} можно выбрать только одно значение."
                 );
             }
+        }
+
+        $parentValueNames = DimensionValue::query()
+            ->whereIn('id', $selectedValueIds)
+            ->whereHas('children', fn ($query) => $query->where('is_active', true))
+            ->pluck('name');
+
+        if ($parentValueNames->isNotEmpty()) {
+            $validator->errors()->add(
+                'dimension_value_ids',
+                'Выбирайте только конечные значения настроек проекта: '.$parentValueNames->join(', ').'.'
+            );
+        }
+    }
+
+    private function validateUploadTotalSize(Validator $validator): void
+    {
+        $limits = app(ProjectUploadLimits::class);
+
+        if ($limits->exceedsLimit($this, ['logo', 'screenshots'])) {
+            $validator->errors()->add('files', $limits->errorMessage());
         }
     }
 }

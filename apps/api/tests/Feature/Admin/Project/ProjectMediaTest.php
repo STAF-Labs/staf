@@ -15,10 +15,10 @@ use App\Models\Game\Project\Project;
 use App\Models\Game\Project\ProjectMember;
 use App\Models\Game\Project\ProjectRelease;
 use App\Models\User\User;
-use RuntimeException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 use Tests\TestCase;
 
 class ProjectMediaTest extends TestCase
@@ -81,7 +81,10 @@ class ProjectMediaTest extends TestCase
         Storage::fake('public');
 
         [$user, $gameContentType] = $this->projectContext();
-        $project = Project::query()->create($this->projectPayload($user, $gameContentType));
+        $project = Project::query()->create([
+            ...$this->projectPayload($user, $gameContentType),
+            'status' => 'published',
+        ]);
         $dimension = Dimension::query()->create([
             'game_content_type_id' => $gameContentType->id,
             'name' => 'Версия игры',
@@ -146,10 +149,32 @@ class ProjectMediaTest extends TestCase
             ->assertJsonPath('data.0.dimension_value_ids.0', $value->id);
     }
 
-    public function test_project_release_changelog_must_contain_text(): void
+    public function test_project_release_cannot_be_created_for_unpublished_project(): void
     {
         [$user, $gameContentType] = $this->projectContext();
         $project = Project::query()->create($this->projectPayload($user, $gameContentType));
+
+        $this
+            ->actingAs($user)
+            ->postJson("/api/projects/{$project->id}/releases", [
+                'file' => UploadedFile::fake()->create('release.zip', 10, 'application/zip'),
+                'title' => '1.0.0',
+                'type' => 'beta',
+                'changelog' => $this->filledDocument('Первый релиз.'),
+            ])
+            ->assertConflict()
+            ->assertJsonPath('message', 'Релизы можно добавлять только к опубликованному проекту.');
+
+        $this->assertDatabaseEmpty('project_releases');
+    }
+
+    public function test_project_release_changelog_must_contain_text(): void
+    {
+        [$user, $gameContentType] = $this->projectContext();
+        $project = Project::query()->create([
+            ...$this->projectPayload($user, $gameContentType),
+            'status' => 'published',
+        ]);
 
         $this
             ->actingAs($user)
@@ -171,7 +196,10 @@ class ProjectMediaTest extends TestCase
     public function test_admin_can_view_and_update_project_release(): void
     {
         [$user, $gameContentType] = $this->projectContext();
-        $project = Project::query()->create($this->projectPayload($user, $gameContentType));
+        $project = Project::query()->create([
+            ...$this->projectPayload($user, $gameContentType),
+            'status' => 'published',
+        ]);
         $dimension = Dimension::query()->create([
             'game_content_type_id' => $gameContentType->id,
             'name' => 'Версия игры',
@@ -263,7 +291,29 @@ class ProjectMediaTest extends TestCase
         $this->assertDatabaseHas('project_release_dimension_values', [
             'project_release_id' => $release->id,
             'dimension_value_id' => $replacementValue->id,
+            ]);
+    }
+
+    public function test_release_file_upload_total_size_is_limited(): void
+    {
+        config(['projects.uploads.max_request_bytes' => 1024]);
+
+        [$user, $gameContentType] = $this->projectContext();
+        $project = Project::query()->create([
+            ...$this->projectPayload($user, $gameContentType),
+            'status' => 'published',
         ]);
+
+        $this
+            ->actingAs($user)
+            ->postJson("/api/projects/{$project->id}/releases", [
+                'file' => UploadedFile::fake()->create('release.zip', 2, 'application/zip'),
+                'title' => '1.0.0',
+                'type' => 'release',
+                'changelog' => $this->filledDocument('Первый релиз.'),
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['file']);
     }
 
     public function test_project_release_update_rejects_foreign_release(): void
@@ -557,6 +607,110 @@ class ProjectMediaTest extends TestCase
         ]);
     }
 
+    public function test_project_dimensions_must_use_leaf_values(): void
+    {
+        Storage::fake('public');
+
+        [$user, $gameContentType] = $this->projectContext();
+        $dimension = Dimension::query()->create([
+            'game_content_type_id' => $gameContentType->id,
+            'name' => 'Платформа',
+            'selection_mode' => 'single',
+            'applies_to' => 'project',
+            'is_filterable' => true,
+            'is_required' => true,
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
+        $parentValue = $dimension->values()->create([
+            'name' => 'PC',
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+        $leafValue = $dimension->values()->create([
+            'parent_id' => $parentValue->id,
+            'name' => 'Windows',
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->postJson('/api/projects', [
+                ...$this->projectPayload($user, $gameContentType),
+                'logo' => UploadedFile::fake()->image('logo.png', 512, 512),
+                'dimension_value_ids' => [$parentValue->id],
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['dimension_value_ids']);
+
+        $this
+            ->actingAs($user)
+            ->postJson('/api/projects', [
+                ...$this->projectPayload($user, $gameContentType),
+                'logo' => UploadedFile::fake()->image('logo.png', 512, 512),
+                'dimension_value_ids' => [$leafValue->id],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('dimension_value_ids.0', $leafValue->id);
+    }
+
+    public function test_release_dimensions_must_use_leaf_values(): void
+    {
+        Storage::fake('public');
+
+        [$user, $gameContentType] = $this->projectContext();
+        $project = Project::query()->create([
+            ...$this->projectPayload($user, $gameContentType),
+            'status' => 'published',
+        ]);
+        $dimension = Dimension::query()->create([
+            'game_content_type_id' => $gameContentType->id,
+            'name' => 'Версия игры',
+            'selection_mode' => 'single',
+            'applies_to' => 'release',
+            'is_filterable' => true,
+            'is_required' => true,
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
+        $parentValue = $dimension->values()->create([
+            'name' => '1.x',
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+        $leafValue = $dimension->values()->create([
+            'parent_id' => $parentValue->id,
+            'name' => '1.20',
+            'sort_order' => 1,
+            'is_active' => true,
+        ]);
+
+        $this
+            ->actingAs($user)
+            ->postJson("/api/projects/{$project->id}/releases", [
+                'file' => UploadedFile::fake()->create('release.zip', 10, 'application/zip'),
+                'title' => '1.0.0',
+                'type' => 'release',
+                'changelog' => $this->filledDocument('Первый релиз.'),
+                'dimension_value_ids' => [$parentValue->id],
+            ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['dimension_value_ids']);
+
+        $this
+            ->actingAs($user)
+            ->postJson("/api/projects/{$project->id}/releases", [
+                'file' => UploadedFile::fake()->create('release.zip', 10, 'application/zip'),
+                'title' => '1.0.0',
+                'type' => 'release',
+                'changelog' => $this->filledDocument('Первый релиз.'),
+                'dimension_value_ids' => [$leafValue->id],
+            ])
+            ->assertCreated()
+            ->assertJsonPath('dimension_value_ids.0', $leafValue->id);
+    }
+
     public function test_logo_is_replaced_and_screenshots_are_multiple(): void
     {
         Storage::fake('public');
@@ -819,6 +973,24 @@ class ProjectMediaTest extends TestCase
             'game_content_type_id' => $gameContentType->id,
             'title' => 'Media Project',
             'status' => 'draft',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function filledDocument(string $text): array
+    {
+        return [
+            'type' => 'doc',
+            'content' => [
+                [
+                    'type' => 'paragraph',
+                    'content' => [
+                        ['type' => 'text', 'text' => $text],
+                    ],
+                ],
+            ],
         ];
     }
 }

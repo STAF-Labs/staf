@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin\Project;
 
 use App\Actions\Admin\Project\SaveProjectRelease;
+use App\Enums\Project\ProjectStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Project\StoreProjectReleaseRequest;
 use App\Http\Requests\Admin\Project\UpdateProjectReleaseRequest;
@@ -49,6 +50,8 @@ class ProjectReleaseController extends Controller
         SaveProjectRelease $saveProjectRelease
     ): JsonResponse
     {
+        $this->ensureProjectCanHaveReleases($project);
+
         $release = $saveProjectRelease->execute(
             $project,
             $request->validated(),
@@ -70,6 +73,8 @@ class ProjectReleaseController extends Controller
         SaveProjectRelease $saveProjectRelease
     ): JsonResponse {
         abort_if($release->project_id !== $project->id, 404);
+
+        $this->ensureProjectCanHaveReleases($project);
 
         $release = $saveProjectRelease->execute(
             $project,
@@ -96,5 +101,14 @@ class ProjectReleaseController extends Controller
         return response()->json([
             'message' => 'Релиз удален.',
         ]);
+    }
+
+    private function ensureProjectCanHaveReleases(Project $project): void
+    {
+        abort_if(
+            $project->status !== ProjectStatus::PUBLISHED,
+            409,
+            'Релизы можно добавлять только к опубликованному проекту.'
+        );
     }
 }

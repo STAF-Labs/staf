@@ -7,6 +7,7 @@ use App\Enums\CommonStatus;
 use App\Enums\MembershipStatus;
 use App\Enums\Org\OrgMemberRole;
 use App\Enums\Project\ProjectMemberRole;
+use App\Enums\Project\ProjectStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Project\ReorderProjectScreenshotsRequest;
 use App\Http\Requests\Admin\Project\StoreProjectMemberRequest;
@@ -313,6 +314,14 @@ class ProjectController extends Controller
     ): JsonResponse
     {
         $validated = $request->validated();
+
+        abort_if(
+            isset($validated['status'])
+            && $validated['status'] !== ProjectStatus::PUBLISHED->value
+            && $project->releases()->exists(),
+            409,
+            'Проект с релизами не может быть переведен в неопубликованный статус.'
+        );
 
         $project = $saveProjectStep->execute(
             $validated,
