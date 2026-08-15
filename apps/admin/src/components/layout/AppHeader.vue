@@ -84,11 +84,24 @@ onBeforeUnmount(() => {
         @click="toggleMenu"
       >
         <span class="account-button__avatar">{{ avatarLabel }}</span>
-        <ChevronDown class="account-button__icon" :size="16" :stroke-width="2" aria-hidden="true" />
+        <ChevronDown
+          class="account-button__icon"
+          :class="{ 'account-button__icon--open': isMenuOpen }"
+          :size="16"
+          :stroke-width="2"
+          aria-hidden="true"
+        />
       </button>
 
       <div v-if="isMenuOpen" class="account-menu" role="menu">
-        <a class="account-menu__item" href="#" role="menuitem" @click="closeMenu">Профиль</a>
+        <RouterLink
+          class="account-menu__item"
+          :to="{ name: 'profile.show' }"
+          role="menuitem"
+          @click="closeMenu"
+        >
+          Профиль
+        </RouterLink>
 
         <div class="account-menu__section">
           <button
@@ -155,6 +168,11 @@ onBeforeUnmount(() => {
 
 .account-button__icon {
   color: var(--color-text-muted);
+  transition: transform 160ms ease;
+}
+
+.account-button__icon--open {
+  transform: rotate(180deg);
 }
 
 .account-menu {
@@ -181,6 +199,7 @@ onBeforeUnmount(() => {
   color: var(--color-text);
   font-size: 14px;
   font-weight: 600;
+  text-decoration: none;
   text-align: left;
   white-space: nowrap;
   background: transparent;

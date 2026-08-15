@@ -54,6 +54,22 @@ const router = createRouter({
       },
     },
     {
+      path: '/profile',
+      name: 'profile.show',
+      component: UserView,
+      props: {
+        profileMode: true,
+      },
+      meta: {
+        breadcrumb: {
+          label: 'Профиль',
+          parentName: 'dashboard',
+        },
+        requiresAuth: true,
+        title: 'Профиль',
+      },
+    },
+    {
       path: '/users',
       name: 'users.index',
       component: UsersView,
