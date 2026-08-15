@@ -1,3 +1,5 @@
+import type { ProjectListItem } from './project'
+
 export type ListResponse<T> = {
   data: T[]
   total: number
@@ -46,4 +48,5 @@ export type UserDetail = UserListItem & {
     is_visible: boolean
     verified_at: string | null
   }[]
+  projects: ProjectListItem[]
 }

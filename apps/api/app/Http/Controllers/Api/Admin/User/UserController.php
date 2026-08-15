@@ -3,11 +3,16 @@
 namespace App\Http\Controllers\Api\Admin\User;
 
 use App\Enums\CommonStatus;
+use App\Enums\MembershipStatus;
+use App\Enums\Org\OrgMemberRole;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\User\UserDetailResource;
 use App\Http\Resources\User\UserResource;
+use App\Models\Game\Project\Project;
+use App\Models\Org\Organization;
 use App\Models\User\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -106,9 +111,7 @@ class UserController extends Controller
 
     public function show(Request $request, User $user): JsonResponse
     {
-        return response()->json(
-            UserDetailResource::make($user->load(['memberOf.inOrganization', 'userProfile.media']))->resolve($request)
-        );
+        return $this->userDetailResponse($request, $user);
     }
 
     public function block(Request $request, User $user): JsonResponse
@@ -117,9 +120,7 @@ class UserController extends Controller
             'status' => CommonStatus::BLOCKED,
         ])->save();
 
-        return response()->json(
-            UserDetailResource::make($user->load(['memberOf.inOrganization', 'userProfile.media']))->resolve($request)
-        );
+        return $this->userDetailResponse($request, $user);
     }
 
     public function unblock(Request $request, User $user): JsonResponse
@@ -128,9 +129,7 @@ class UserController extends Controller
             'status' => CommonStatus::ACTIVE,
         ])->save();
 
-        return response()->json(
-            UserDetailResource::make($user->load(['memberOf.inOrganization', 'userProfile.media']))->resolve($request)
-        );
+        return $this->userDetailResponse($request, $user);
     }
 
     public function freeze(Request $request, User $user): JsonResponse
@@ -139,9 +138,7 @@ class UserController extends Controller
             'status' => CommonStatus::SUSPENDED,
         ])->save();
 
-        return response()->json(
-            UserDetailResource::make($user->load(['memberOf.inOrganization', 'userProfile.media']))->resolve($request)
-        );
+        return $this->userDetailResponse($request, $user);
     }
 
     public function unfreeze(Request $request, User $user): JsonResponse
@@ -150,9 +147,7 @@ class UserController extends Controller
             'status' => CommonStatus::ACTIVE,
         ])->save();
 
-        return response()->json(
-            UserDetailResource::make($user->load(['memberOf.inOrganization', 'userProfile.media']))->resolve($request)
-        );
+        return $this->userDetailResponse($request, $user);
     }
 
     public function destroy(User $user): JsonResponse
@@ -162,5 +157,48 @@ class UserController extends Controller
         return response()->json([
             'message' => 'Пользователь удален.',
         ]);
+    }
+
+    private function userDetailResponse(Request $request, User $user): JsonResponse
+    {
+        $ownerOrganizationIds = $user
+            ->memberOf()
+            ->where('role', OrgMemberRole::OWNER)
+            ->where('status', MembershipStatus::ACTIVE)
+            ->pluck('organization_id');
+
+        $activityProjects = Project::query()
+            ->with([
+                'ownerable' => fn (MorphTo $morphTo) => $morphTo->morphWith([
+                    User::class => ['userProfile'],
+                ]),
+                'gameContentType.game',
+                'gameContentType.contentType',
+                'dimensionValues',
+                'media',
+            ])
+            ->withCount('releases')
+            ->withMax('releases', 'released_at')
+            ->where(function (Builder $query) use ($user, $ownerOrganizationIds): void {
+                $query
+                    ->where(function (Builder $query) use ($user): void {
+                        $query
+                            ->where('ownerable_type', User::class)
+                            ->where('ownerable_id', $user->id);
+                    })
+                    ->orWhere(function (Builder $query) use ($ownerOrganizationIds): void {
+                        $query
+                            ->where('ownerable_type', Organization::class)
+                            ->whereIn('ownerable_id', $ownerOrganizationIds);
+                    });
+            })
+            ->latest('id')
+            ->get();
+
+        $user
+            ->load(['memberOf.inOrganization', 'userProfile.media'])
+            ->setRelation('activityProjects', $activityProjects);
+
+        return response()->json(UserDetailResource::make($user)->resolve($request));
     }
 }

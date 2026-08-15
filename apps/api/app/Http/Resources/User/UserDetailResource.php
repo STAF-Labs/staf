@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\User;
 
+use App\Http\Resources\Game\Project\ProjectResource;
 use App\Models\User\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -61,6 +62,10 @@ class UserDetailResource extends JsonResource
                 ->filter()
                 ->values()
                 ->all()),
+            'projects' => $this->whenLoaded(
+                'activityProjects',
+                fn (): array => ProjectResource::collection($this->activityProjects)->resolve($request),
+            ),
         ];
     }
 }
