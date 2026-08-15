@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import {
   ArrowLeft,
+  Calendar,
   Check,
+  ChevronDown,
   ChevronRight,
   Copy,
   GripVertical,
+  Image,
+  Info,
+  MoreHorizontal,
   Pencil,
+  PlayCircle,
   Plus,
+  RotateCcw,
   Settings2,
   SlidersHorizontal,
   Tags,
@@ -16,8 +23,9 @@ import {
 import { AxiosError } from 'axios'
 import Sortable, { type SortableEvent } from 'sortablejs'
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import AppShell from '@/components/layout/AppShell.vue'
+import DeleteModal from '@/components/ui/DeleteModal.vue'
 import RichTextRenderer from '@/components/ui/RichTextRenderer.vue'
 import SearchField from '@/components/ui/SearchField.vue'
 import StepIndicator from '@/components/ui/StepIndicator.vue'
@@ -27,6 +35,7 @@ import {
   copyGameDimensions,
   createGameDimension,
   createGameDimensionValue,
+  deleteGame as removeGame,
   deleteGameDimension,
   deleteGameDimensionValue,
   detachGameContentType,
@@ -40,11 +49,37 @@ import {
   type GameDimension,
   type GameDimensionValue,
 } from '@/shared/games/games'
+import {
+  deleteProject as removeProject,
+  fetchProjectReleases,
+  fetchProjects,
+  type ProjectListItem,
+  type ProjectStatus,
+} from '@/shared/projects/projects'
 import '@/assets/styles/game-view.css'
 
+type ProjectStatusFilter = ProjectStatus | 'all'
+type ProjectSortOption = 'title_asc' | 'title_desc' | 'released_at'
+type ProjectDisplayMode = 'cards' | 'list'
+
 const route = useRoute()
+const router = useRouter()
 const copyFilterSteps = ['Тип контента', 'Фильтры'] as const
+const projectStatusFilterOptions: Array<{ value: ProjectStatusFilter; label: string }> = [
+  { value: 'all', label: 'Все статусы' },
+  { value: 'draft', label: 'Черновик' },
+  { value: 'on_moderation', label: 'На модерации' },
+  { value: 'published', label: 'Опубликован' },
+  { value: 'rejected', label: 'Отклонён' },
+]
+const projectSortOptions: Array<{ value: ProjectSortOption; label: string }> = [
+  { value: 'title_asc', label: 'А-Я' },
+  { value: 'title_desc', label: 'Я-А' },
+  { value: 'released_at', label: 'Дата релиза' },
+]
+const projectPageSizeOptions = [10, 20, 30, 40, 50]
 const game = ref<GameDetail | null>(null)
+const projects = ref<ProjectListItem[]>([])
 const contentTypes = ref<ContentTypeListItem[]>([])
 const gameContentTypes = ref<GameContentTypeListItem[]>([])
 const connectedContentTypeSearch = ref('')
@@ -84,9 +119,125 @@ const selectedCopyFilterIds = ref<number[]>([])
 const isCopyFiltersLoading = ref(false)
 const isCopyingFilters = ref(false)
 const message = ref('')
+const activeTab = ref<'main' | 'filters' | 'projects'>('main')
+const isMoreOpen = ref(false)
+const isDeleteModalOpen = ref(false)
+const isDeletingGame = ref(false)
+const deleteGameError = ref('')
+const projectSearch = ref('')
+const projectReleaseDateFrom = ref('')
+const projectReleaseDateTo = ref('')
+const projectStatusFilter = ref<ProjectStatusFilter>('all')
+const projectContentTypeFilter = ref('all')
+const selectedProjectFilterValueIds = ref<Record<number, number[]>>({})
+const selectedReleaseFilterValueIds = ref<Record<number, number[]>>({})
+const projectReleaseDimensionValueIds = ref<Record<number, number[]>>({})
+const projectSort = ref<ProjectSortOption>('title_asc')
+const projectPageSize = ref(20)
+const projectDisplayMode = ref<ProjectDisplayMode>('cards')
+const deletingProjectId = ref<number | null>(null)
+const pendingDeleteProject = ref<ProjectListItem | null>(null)
+const tabs = [
+  { value: 'main', label: 'Основной' },
+  { value: 'filters', label: 'Фильтры' },
+  { value: 'projects', label: 'Проекты' },
+] as const
 
 const title = computed(() => game.value?.name ?? 'Игра')
 const statusClass = computed(() => `game-view-status--${game.value?.status_color ?? 'gray'}`)
+const deleteModalDescription = computed(() => {
+  const name = game.value?.name ?? 'игра'
+
+  return `Игра ${name} будет удалена. Это действие скроет ее из списка.`
+})
+const gameProjects = computed(() => {
+  if (!game.value) {
+    return []
+  }
+
+  return projects.value.filter((project) => project.game_id === game.value?.id)
+})
+const projectContentTypeOptions = computed(() =>
+  gameContentTypes.value
+    .map((gameContentType) => ({
+      value: String(gameContentType.id),
+      label: gameContentType.content_type_name ?? 'Тип контента',
+    }))
+    .sort((firstOption, secondOption) =>
+      firstOption.label.localeCompare(secondOption.label, 'ru-RU'),
+    ),
+)
+const projectFilterDimensions = computed(() =>
+  filters.value.filter(
+    (filter) =>
+      filter.is_active &&
+      filter.is_filterable &&
+      filter.applies_to === 'project' &&
+      (projectContentTypeFilter.value === 'all' ||
+        String(filter.game_content_type_id) === projectContentTypeFilter.value),
+  ),
+)
+const releaseFilterDimensions = computed(() =>
+  filters.value.filter(
+    (filter) =>
+      filter.is_active &&
+      filter.is_filterable &&
+      filter.applies_to === 'release' &&
+      (projectContentTypeFilter.value === 'all' ||
+        String(filter.game_content_type_id) === projectContentTypeFilter.value),
+  ),
+)
+const hasActiveProjectFilters = computed(() =>
+  Boolean(
+    projectSearch.value.trim() ||
+    projectContentTypeFilter.value !== 'all' ||
+    projectReleaseDateFrom.value ||
+    projectReleaseDateTo.value ||
+    projectStatusFilter.value !== 'all' ||
+    hasSelectedFilterValues(selectedProjectFilterValueIds.value) ||
+    hasSelectedFilterValues(selectedReleaseFilterValueIds.value),
+  ),
+)
+const filteredProjects = computed(() =>
+  gameProjects.value.filter(
+    (project) =>
+      matchesProjectSearch(project) &&
+      matchesProjectContentTypeFilter(project) &&
+      matchesProjectReleaseDateFilter(project) &&
+      matchesProjectStatusFilter(project) &&
+      matchesProjectDimensionFilters(project) &&
+      matchesReleaseDimensionFilters(project),
+  ),
+)
+const sortedProjects = computed(() =>
+  [...filteredProjects.value].sort((firstProject, secondProject) => {
+    if (projectSort.value === 'title_desc') {
+      return secondProject.title.localeCompare(firstProject.title, 'ru-RU')
+    }
+
+    if (projectSort.value === 'released_at') {
+      return projectReleaseTimestamp(secondProject) - projectReleaseTimestamp(firstProject)
+    }
+
+    return firstProject.title.localeCompare(secondProject.title, 'ru-RU')
+  }),
+)
+const visibleProjects = computed(() => sortedProjects.value.slice(0, projectPageSize.value))
+const projectsSubtitle = computed(() => {
+  if (
+    hasActiveProjectFilters.value &&
+    filteredProjects.value.length !== gameProjects.value.length
+  ) {
+    return `Всего проектов: ${gameProjects.value.length}. Найдено: ${filteredProjects.value.length}.`
+  }
+
+  return `Всего проектов: ${gameProjects.value.length}.`
+})
+const projectDeleteModalDescription = computed(() => {
+  const title = pendingDeleteProject.value?.title ?? 'проект'
+
+  return `Проект «${title}», его релизы и файлы будут удалены без возможности восстановления.`
+})
 const availableContentTypes = computed(() => {
   const attachedIds = new Set(gameContentTypes.value.map((item) => item.content_type_id))
 
@@ -188,6 +339,11 @@ watch(pendingFilterValueId, (valueId) => {
   filterValueSortable?.option('disabled', valueId !== null)
 })
 
+watch(projectContentTypeFilter, () => {
+  selectedProjectFilterValueIds.value = {}
+  selectedReleaseFilterValueIds.value = {}
+})
+
 function formatDate(value: string | null): string {
   if (!value) {
     return 'Не указана'
@@ -200,21 +356,351 @@ function formatDate(value: string | null): string {
   }).format(new Date(value))
 }
 
+function toggleMoreMenu(): void {
+  isMoreOpen.value = !isMoreOpen.value
+}
+
+async function copyGameLink(): Promise<void> {
+  await navigator.clipboard?.writeText(window.location.href)
+  isMoreOpen.value = false
+  message.value = 'Ссылка на игру скопирована.'
+}
+
+function openGameDeleteModal(): void {
+  deleteGameError.value = ''
+  isDeleteModalOpen.value = true
+  isMoreOpen.value = false
+}
+
+function closeGameDeleteModal(): void {
+  if (isDeletingGame.value) {
+    return
+  }
+
+  isDeleteModalOpen.value = false
+}
+
+async function confirmDeleteGame(): Promise<void> {
+  if (!game.value) {
+    return
+  }
+
+  isDeletingGame.value = true
+  deleteGameError.value = ''
+
+  try {
+    await removeGame(game.value.id)
+    await router.push({ name: 'games.index' })
+  } catch {
+    deleteGameError.value = 'Не удалось удалить игру.'
+  } finally {
+    isDeletingGame.value = false
+    isDeleteModalOpen.value = false
+  }
+}
+
+function matchesProjectSearch(project: ProjectListItem): boolean {
+  const searchQuery = projectSearch.value.trim().toLocaleLowerCase('ru-RU')
+
+  if (!searchQuery) {
+    return true
+  }
+
+  return project.title.toLocaleLowerCase('ru-RU').includes(searchQuery)
+}
+
+function matchesProjectContentTypeFilter(project: ProjectListItem): boolean {
+  return (
+    projectContentTypeFilter.value === 'all' ||
+    String(project.game_content_type_id) === projectContentTypeFilter.value
+  )
+}
+
+function matchesProjectReleaseDateFilter(project: ProjectListItem): boolean {
+  if (!projectReleaseDateFrom.value && !projectReleaseDateTo.value) {
+    return true
+  }
+
+  if (!project.released_at) {
+    return false
+  }
+
+  const releaseDate = new Date(project.released_at)
+  releaseDate.setHours(0, 0, 0, 0)
+
+  if (projectReleaseDateFrom.value) {
+    const dateFrom = new Date(projectReleaseDateFrom.value)
+    dateFrom.setHours(0, 0, 0, 0)
+
+    if (releaseDate < dateFrom) {
+      return false
+    }
+  }
+
+  if (projectReleaseDateTo.value) {
+    const dateTo = new Date(projectReleaseDateTo.value)
+    dateTo.setHours(0, 0, 0, 0)
+
+    if (releaseDate > dateTo) {
+      return false
+    }
+  }
+
+  return true
+}
+
+function matchesProjectStatusFilter(project: ProjectListItem): boolean {
+  return projectStatusFilter.value === 'all' || project.status === projectStatusFilter.value
+}
+
+function matchesProjectDimensionFilters(project: ProjectListItem): boolean {
+  const projectValueIds = new Set(project.dimension_value_ids ?? [])
+
+  return Object.entries(selectedProjectFilterValueIds.value).every(([, valueIds]) => {
+    if (valueIds.length === 0) {
+      return true
+    }
+
+    return valueIds.some((valueId) => projectValueIds.has(valueId))
+  })
+}
+
+function matchesReleaseDimensionFilters(project: ProjectListItem): boolean {
+  const releaseValueIds = new Set(projectReleaseDimensionValueIds.value[project.id] ?? [])
+
+  return Object.entries(selectedReleaseFilterValueIds.value).every(([, valueIds]) => {
+    if (valueIds.length === 0) {
+      return true
+    }
+
+    return valueIds.some((valueId) => releaseValueIds.has(valueId))
+  })
+}
+
+function hasSelectedFilterValues(filtersState: Record<number, number[]>): boolean {
+  return Object.values(filtersState).some((valueIds) => valueIds.length > 0)
+}
+
+function projectSidebarFilterSelectedValueCount(
+  filterId: number,
+  target: 'project' | 'release',
+): number {
+  const filtersState =
+    target === 'project' ? selectedProjectFilterValueIds.value : selectedReleaseFilterValueIds.value
+
+  return filtersState[filterId]?.length ?? 0
+}
+
+function toggleProjectSidebarFilterValue(
+  filterId: number,
+  valueId: number,
+  target: 'project' | 'release',
+): void {
+  const filtersState =
+    target === 'project' ? selectedProjectFilterValueIds.value : selectedReleaseFilterValueIds.value
+  const selectedValueIds = filtersState[filterId] ?? []
+
+  filtersState[filterId] = selectedValueIds.includes(valueId)
+    ? selectedValueIds.filter((selectedValueId) => selectedValueId !== valueId)
+    : [...selectedValueIds, valueId]
+}
+
+function projectSidebarFilterValueIsSelected(
+  filterId: number,
+  valueId: number,
+  target: 'project' | 'release',
+): boolean {
+  const filtersState =
+    target === 'project' ? selectedProjectFilterValueIds.value : selectedReleaseFilterValueIds.value
+
+  return filtersState[filterId]?.includes(valueId) ?? false
+}
+
+function projectSidebarRootValues(filter: GameDimension): GameDimensionValue[] {
+  return filter.values
+    .filter((value) => value.is_active && value.parent_id === null)
+    .sort(compareDimensionValueOrder)
+}
+
+function projectSidebarChildValues(
+  filter: GameDimension,
+  parentValue: GameDimensionValue,
+): GameDimensionValue[] {
+  return filter.values
+    .filter((value) => value.is_active && value.parent_id === parentValue.id)
+    .sort(compareDimensionValueOrder)
+}
+
+function projectSidebarValueHasChildren(filter: GameDimension, value: GameDimensionValue): boolean {
+  return filter.values.some(
+    (childValue) => childValue.is_active && childValue.parent_id === value.id,
+  )
+}
+
+function projectReleaseTimestamp(project: ProjectListItem): number {
+  if (!project.released_at) {
+    return 0
+  }
+
+  return new Date(project.released_at).getTime()
+}
+
+function projectSummary(project: ProjectListItem): string {
+  return richTextToPlainText(project.summary) || 'Краткое описание пока не добавлено.'
+}
+
+function projectTags(project: ProjectListItem): string[] {
+  if (!Array.isArray(project.tags)) {
+    return []
+  }
+
+  return project.tags.filter((tag): tag is string => typeof tag === 'string' && tag.trim() !== '')
+}
+
+function projectUpdatedAt(project: ProjectListItem): string {
+  if (!project.updated_at) {
+    return 'Дата не указана'
+  }
+
+  return new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short' }).format(
+    new Date(project.updated_at),
+  )
+}
+
+function projectStatusClass(project: ProjectListItem): string {
+  const color = project.status_color ?? 'gray'
+
+  return ['gray', 'warning', 'success', 'danger'].includes(color)
+    ? `project-card__status--${color}`
+    : 'project-card__status--gray'
+}
+
+function projectIsDraft(project: ProjectListItem): boolean {
+  return project.status === 'draft'
+}
+
+function projectActionRoute(project: ProjectListItem): RouteLocationRaw {
+  if (projectIsDraft(project)) {
+    return { name: 'projects.continue', params: { id: String(project.id) } }
+  }
+
+  return { name: 'projects.edit', params: { id: String(project.id) } }
+}
+
+function projectActionLabel(project: ProjectListItem): string {
+  return projectIsDraft(project) ? 'Продолжить создание' : 'Редактировать проект'
+}
+
+function richTextToPlainText(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.map(richTextToPlainText).filter(Boolean).join(' ')
+  }
+
+  if (!value || typeof value !== 'object') {
+    return ''
+  }
+
+  if ('text' in value && typeof value.text === 'string') {
+    return value.text
+  }
+
+  return 'content' in value ? richTextToPlainText(value.content) : ''
+}
+
+function resetProjectFilters(): void {
+  projectSearch.value = ''
+  projectContentTypeFilter.value = 'all'
+  projectReleaseDateFrom.value = ''
+  projectReleaseDateTo.value = ''
+  projectStatusFilter.value = 'all'
+  selectedProjectFilterValueIds.value = {}
+  selectedReleaseFilterValueIds.value = {}
+}
+
+function toggleProjectDisplayMode(): void {
+  projectDisplayMode.value = projectDisplayMode.value === 'cards' ? 'list' : 'cards'
+}
+
+function openProjectDeleteModal(project: ProjectListItem): void {
+  pendingDeleteProject.value = project
+}
+
+function closeProjectDeleteModal(): void {
+  if (deletingProjectId.value !== null) {
+    return
+  }
+
+  pendingDeleteProject.value = null
+}
+
+async function confirmDeleteProject(): Promise<void> {
+  if (!pendingDeleteProject.value) {
+    return
+  }
+
+  const project = pendingDeleteProject.value
+
+  deletingProjectId.value = project.id
+  message.value = ''
+
+  try {
+    await removeProject(project.id)
+    projects.value = projects.value.filter(({ id }) => id !== project.id)
+  } catch {
+    message.value = 'Не удалось удалить проект.'
+  } finally {
+    deletingProjectId.value = null
+    pendingDeleteProject.value = null
+  }
+}
+
 async function loadGame(): Promise<void> {
   isLoading.value = true
   message.value = ''
 
   try {
     const gameId = String(route.params.id)
-    const [gameResponse, gameContentTypesResponse, contentTypesResponse] = await Promise.all([
-      fetchGame(gameId),
-      fetchGameContentTypes(gameId),
-      fetchContentTypes(),
-    ])
+    const [gameResponse, gameContentTypesResponse, contentTypesResponse, projectsResponse] =
+      await Promise.all([
+        fetchGame(gameId),
+        fetchGameContentTypes(gameId),
+        fetchContentTypes(),
+        fetchProjects(),
+      ])
 
     game.value = gameResponse
     gameContentTypes.value = gameContentTypesResponse.data
     contentTypes.value = contentTypesResponse.data
+    projects.value = projectsResponse.data
+    const currentGameProjects = projectsResponse.data.filter(
+      (project) => project.game_id === gameResponse.id,
+    )
+    const [dimensionResponses, releaseResponses] = await Promise.all([
+      Promise.all(
+        gameContentTypesResponse.data.map((gameContentType) =>
+          fetchGameDimensions(gameResponse.id, gameContentType.id),
+        ),
+      ),
+      Promise.all(currentGameProjects.map((project) => fetchProjectReleases(project.id))),
+    ])
+
+    filters.value = dimensionResponses.flatMap((response) => response.data)
+    loadedFilterContextIds.value = gameContentTypesResponse.data.map(
+      (gameContentType) => gameContentType.id,
+    )
+    projectReleaseDimensionValueIds.value = Object.fromEntries(
+      currentGameProjects.map((project, index) => {
+        const valueIds = new Set<number>()
+
+        for (const release of releaseResponses[index]?.data ?? []) {
+          for (const valueId of release.dimension_value_ids ?? []) {
+            valueIds.add(valueId)
+          }
+        }
+
+        return [project.id, [...valueIds]]
+      }),
+    )
     route.meta.breadcrumbLabel = game.value.name
   } catch {
     message.value = 'Не удалось загрузить игру.'
@@ -562,7 +1048,8 @@ function initializeFilterValueSortable(): void {
     ghostClass: 'game-content-types-panel__value--ghost',
     chosenClass: 'game-content-types-panel__value--chosen',
     dragClass: 'game-content-types-panel__value--dragging',
-    onMove: (event) => canMoveFilterValue(event.dragged, event.related, event.willInsertAfter ?? false),
+    onMove: (event) =>
+      canMoveFilterValue(event.dragged, event.related, event.willInsertAfter ?? false),
     onEnd: (event: SortableEvent) => {
       if (event.oldIndex === undefined || event.newIndex === undefined) {
         return
@@ -660,7 +1147,10 @@ function orderDimensionValuesHierarchically(values: GameDimensionValue[]): GameD
   return orderedValues
 }
 
-function compareDimensionValueOrder(firstValue: GameDimensionValue, secondValue: GameDimensionValue): number {
+function compareDimensionValueOrder(
+  firstValue: GameDimensionValue,
+  secondValue: GameDimensionValue,
+): number {
   if (firstValue.sort_order !== secondValue.sort_order) {
     return firstValue.sort_order - secondValue.sort_order
   }
@@ -932,31 +1422,94 @@ void loadGame()
       <div v-if="isLoading" class="game-view__loading">Загрузка...</div>
 
       <template v-else-if="game">
+        <header class="game-view__header">
+          <div class="game-view__breadcrumbs">
+            <RouterLink :to="{ name: 'games.index' }" aria-label="Назад к играм">
+              <ArrowLeft :size="16" aria-hidden="true" />
+              <span>Игры</span>
+            </RouterLink>
+            <span aria-hidden="true">/</span>
+            <span>{{ game.name }}</span>
+          </div>
+
+          <div class="game-view__heading-row">
+            <div>
+              <h1>{{ title }}</h1>
+              <div class="game-view__meta">
+                <span>/{{ game.slug }}</span>
+                <span class="game-view-status" :class="statusClass">
+                  {{ game.status_label ?? 'Не указан' }}
+                </span>
+              </div>
+            </div>
+
+            <div class="game-view__actions">
+              <RouterLink
+                class="button button--secondary game-view__edit"
+                :to="{ name: 'games.edit', params: { id: String(game.id) } }"
+                aria-label="Редактировать игру"
+                title="Редактировать игру"
+              >
+                <Pencil :size="16" aria-hidden="true" />
+                Редактировать
+              </RouterLink>
+              <button
+                class="button button--secondary game-view__more"
+                type="button"
+                :aria-expanded="isMoreOpen"
+                aria-haspopup="menu"
+                @click="toggleMoreMenu"
+              >
+                <MoreHorizontal :size="18" aria-hidden="true" />
+                <span>Ещё</span>
+                <ChevronDown
+                  class="game-view__more-chevron"
+                  :class="{ 'game-view__more-chevron--open': isMoreOpen }"
+                  :size="16"
+                  aria-hidden="true"
+                />
+              </button>
+              <div v-if="isMoreOpen" class="game-view__more-menu" role="menu">
+                <button type="button" role="menuitem" @click="copyGameLink">
+                  <Copy :size="15" aria-hidden="true" />
+                  Скопировать ссылку
+                </button>
+                <button
+                  class="game-view__more-menu-danger"
+                  type="button"
+                  role="menuitem"
+                  :disabled="isDeletingGame"
+                  @click="openGameDeleteModal"
+                >
+                  <Trash2 :size="15" aria-hidden="true" />
+                  Удалить
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
+        <p v-if="deleteGameError" class="game-view__action-error">{{ deleteGameError }}</p>
+
+        <div class="project-tabs" role="tablist" aria-label="Разделы игры">
+          <button
+            v-for="tab in tabs"
+            :key="tab.value"
+            class="project-tab"
+            :class="{ 'project-tab--active': activeTab === tab.value }"
+            type="button"
+            role="tab"
+            :aria-selected="activeTab === tab.value"
+            @click="activeTab = tab.value"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
+
         <div class="game-view__banner">
           <img v-if="game.banner_url" :src="game.banner_url" :alt="game.name" />
         </div>
 
-        <article class="game-view__body">
-          <div class="game-view__topbar">
-            <RouterLink
-              class="data-page__back-link game-view__back"
-              :to="{ name: 'games.index' }"
-              aria-label="Назад к играм"
-            >
-              <ArrowLeft :size="18" :stroke-width="1.9" aria-hidden="true" />
-              <span>Игры</span>
-            </RouterLink>
-
-            <RouterLink
-              class="game-view__edit"
-              :to="{ name: 'games.edit', params: { id: String(game.id) } }"
-              aria-label="Редактировать игру"
-              title="Редактировать игру"
-            >
-              <Pencil :size="17" :stroke-width="2" aria-hidden="true" />
-            </RouterLink>
-          </div>
-
+        <article v-if="activeTab === 'main'" class="game-view__body">
           <section class="game-view__summary" aria-label="Основная информация">
             <div class="game-view__logo">
               <img v-if="game.logo_url" :src="game.logo_url" :alt="game.name" />
@@ -965,7 +1518,8 @@ void loadGame()
 
             <div class="game-view__facts">
               <div class="game-view__field">
-                <h2 class="game-view__title">{{ title }}</h2>
+                <span class="game-view__label">Slug</span>
+                <span class="game-view__value">/{{ game.slug }}</span>
               </div>
 
               <div class="game-view__field">
@@ -990,7 +1544,9 @@ void loadGame()
               empty-text="Описание игры пока не заполнено."
             />
           </section>
+        </article>
 
+        <article v-else-if="activeTab === 'filters'" class="game-view__body">
           <section class="game-view__section game-content-types" aria-label="Типы контента игры">
             <header class="game-content-types__header">
               <div class="game-content-types__heading">
@@ -1504,6 +2060,393 @@ void loadGame()
           </section>
         </article>
 
+        <article v-else class="game-view__body">
+          <section class="game-view__section game-view-projects" aria-label="Проекты игры">
+            <header class="game-content-types__header">
+              <div class="game-content-types__heading">
+                <span class="game-view__section-title">Проекты</span>
+                <p class="game-content-types__summary">{{ projectsSubtitle }}</p>
+              </div>
+            </header>
+
+            <div class="game-view-projects__layout">
+              <aside class="game-project-filter-sidebar" aria-label="Фильтры проектов">
+                <details class="game-project-filter-block" open>
+                  <summary class="game-project-filter-block__summary">
+                    <span>Тип контента</span>
+                    <span v-if="projectContentTypeFilter !== 'all'">1</span>
+                  </summary>
+
+                  <div class="game-project-filter-block__list">
+                    <label class="game-project-filter-option">
+                      <input
+                        v-model="projectContentTypeFilter"
+                        type="radio"
+                        name="project-content-type-filter"
+                        value="all"
+                      />
+                      <span>Все типы</span>
+                    </label>
+                    <label
+                      v-for="option in projectContentTypeOptions"
+                      :key="option.value"
+                      class="game-project-filter-option"
+                    >
+                      <input
+                        v-model="projectContentTypeFilter"
+                        type="radio"
+                        name="project-content-type-filter"
+                        :value="option.value"
+                      />
+                      <span>{{ option.label }}</span>
+                    </label>
+                  </div>
+                </details>
+
+                <aside
+                  v-if="projectContentTypeFilter === 'all'"
+                  class="game-project-filter-note"
+                  aria-label="Информация о фильтрах проектов"
+                >
+                  <span class="game-project-filter-note__icon" aria-hidden="true">
+                    <Info :size="21" :stroke-width="2" />
+                  </span>
+                  <div>
+                    <strong>Фильтры проектов</strong>
+                    <p>Выберите тип контента, чтобы увидеть проектные и релизные фильтры.</p>
+                  </div>
+                </aside>
+
+                <template v-else>
+                  <details
+                    v-for="filter in projectFilterDimensions"
+                    :key="`project-filter-${filter.id}`"
+                    class="game-project-filter-block"
+                    open
+                  >
+                    <summary class="game-project-filter-block__summary">
+                      <span>{{ filter.name }}</span>
+                      <span v-if="projectSidebarFilterSelectedValueCount(filter.id, 'project')">
+                        {{ projectSidebarFilterSelectedValueCount(filter.id, 'project') }}
+                      </span>
+                    </summary>
+
+                    <div class="game-project-filter-block__list">
+                      <template v-for="value in projectSidebarRootValues(filter)" :key="value.id">
+                        <details
+                          v-if="projectSidebarValueHasChildren(filter, value)"
+                          class="game-project-filter-group"
+                        >
+                          <summary class="game-project-filter-group__summary">
+                            {{ value.name }}
+                          </summary>
+
+                          <label
+                            v-for="childValue in projectSidebarChildValues(filter, value)"
+                            :key="childValue.id"
+                            class="game-project-filter-option game-project-filter-option--child"
+                          >
+                            <input
+                              type="checkbox"
+                              :checked="
+                                projectSidebarFilterValueIsSelected(
+                                  filter.id,
+                                  childValue.id,
+                                  'project',
+                                )
+                              "
+                              @change="
+                                toggleProjectSidebarFilterValue(filter.id, childValue.id, 'project')
+                              "
+                            />
+                            <span>{{ childValue.name }}</span>
+                          </label>
+                        </details>
+
+                        <label v-else class="game-project-filter-option">
+                          <input
+                            type="checkbox"
+                            :checked="
+                              projectSidebarFilterValueIsSelected(filter.id, value.id, 'project')
+                            "
+                            @change="
+                              toggleProjectSidebarFilterValue(filter.id, value.id, 'project')
+                            "
+                          />
+                          <span>{{ value.name }}</span>
+                        </label>
+                      </template>
+                    </div>
+                  </details>
+
+                  <details
+                    v-for="filter in releaseFilterDimensions"
+                    :key="`release-filter-${filter.id}`"
+                    class="game-project-filter-block"
+                    open
+                  >
+                    <summary class="game-project-filter-block__summary">
+                      <span>{{ filter.name }}</span>
+                      <span v-if="projectSidebarFilterSelectedValueCount(filter.id, 'release')">
+                        {{ projectSidebarFilterSelectedValueCount(filter.id, 'release') }}
+                      </span>
+                    </summary>
+
+                    <div class="game-project-filter-block__list">
+                      <template v-for="value in projectSidebarRootValues(filter)" :key="value.id">
+                        <details
+                          v-if="projectSidebarValueHasChildren(filter, value)"
+                          class="game-project-filter-group"
+                        >
+                          <summary class="game-project-filter-group__summary">
+                            {{ value.name }}
+                          </summary>
+
+                          <label
+                            v-for="childValue in projectSidebarChildValues(filter, value)"
+                            :key="childValue.id"
+                            class="game-project-filter-option game-project-filter-option--child"
+                          >
+                            <input
+                              type="checkbox"
+                              :checked="
+                                projectSidebarFilterValueIsSelected(
+                                  filter.id,
+                                  childValue.id,
+                                  'release',
+                                )
+                              "
+                              @change="
+                                toggleProjectSidebarFilterValue(filter.id, childValue.id, 'release')
+                              "
+                            />
+                            <span>{{ childValue.name }}</span>
+                          </label>
+                        </details>
+
+                        <label v-else class="game-project-filter-option">
+                          <input
+                            type="checkbox"
+                            :checked="
+                              projectSidebarFilterValueIsSelected(filter.id, value.id, 'release')
+                            "
+                            @change="
+                              toggleProjectSidebarFilterValue(filter.id, value.id, 'release')
+                            "
+                          />
+                          <span>{{ value.name }}</span>
+                        </label>
+                      </template>
+                    </div>
+                  </details>
+                </template>
+
+                <details class="game-project-filter-block">
+                  <summary class="game-project-filter-block__summary">
+                    <span>Параметры</span>
+                  </summary>
+
+                  <div class="game-project-filter-block__fields">
+                    <label class="game-filter-field">
+                      <span class="game-filter-field__label">Сортировка</span>
+                      <select v-model="projectSort" class="game-filter-field__control">
+                        <option
+                          v-for="option in projectSortOptions"
+                          :key="option.value"
+                          :value="option.value"
+                        >
+                          {{ option.label }}
+                        </option>
+                      </select>
+                    </label>
+
+                    <label class="game-filter-field">
+                      <span class="game-filter-field__label">Вид</span>
+                      <select v-model="projectPageSize" class="game-filter-field__control">
+                        <option
+                          v-for="option in projectPageSizeOptions"
+                          :key="option"
+                          :value="option"
+                        >
+                          {{ option }}
+                        </option>
+                      </select>
+                    </label>
+                  </div>
+                </details>
+              </aside>
+
+              <div class="game-view-projects__content">
+                <section class="game-filters" aria-label="Фильтры проектов">
+                  <div class="game-filter-top">
+                    <SearchField v-model="projectSearch" placeholder="Поиск по названию" />
+                  </div>
+
+                  <div class="game-filter-row game-filter-row--projects">
+                    <label class="game-filter-field">
+                      <span class="game-filter-field__label">Дата релиза</span>
+                      <span class="game-filter-date-range">
+                        <input
+                          v-model="projectReleaseDateFrom"
+                          class="game-filter-date-range__input"
+                          type="date"
+                          :max="projectReleaseDateTo || undefined"
+                          aria-label="Дата релиза от"
+                        />
+                        <span class="game-filter-date-range__separator">-</span>
+                        <input
+                          v-model="projectReleaseDateTo"
+                          class="game-filter-date-range__input"
+                          type="date"
+                          :min="projectReleaseDateFrom || undefined"
+                          aria-label="Дата релиза до"
+                        />
+                      </span>
+                    </label>
+
+                    <label class="game-filter-field">
+                      <span class="game-filter-field__label">Статус</span>
+                      <select v-model="projectStatusFilter" class="game-filter-field__control">
+                        <option
+                          v-for="option in projectStatusFilterOptions"
+                          :key="option.value"
+                          :value="option.value"
+                        >
+                          {{ option.label }}
+                        </option>
+                      </select>
+                    </label>
+
+                    <button
+                      class="project-display-mode"
+                      type="button"
+                      :aria-pressed="projectDisplayMode === 'list'"
+                      :title="
+                        projectDisplayMode === 'cards' ? 'Показать списком' : 'Показать карточками'
+                      "
+                      :aria-label="
+                        projectDisplayMode === 'cards' ? 'Показать списком' : 'Показать карточками'
+                      "
+                      @click="toggleProjectDisplayMode"
+                    >
+                      <Image :size="18" :stroke-width="1.9" aria-hidden="true" />
+                    </button>
+
+                    <button
+                      class="game-filter-reset"
+                      type="button"
+                      :disabled="!hasActiveProjectFilters"
+                      title="Сбросить фильтры"
+                      @click="resetProjectFilters"
+                    >
+                      <RotateCcw :size="18" :stroke-width="1.9" aria-hidden="true" />
+                      <span>Сбросить</span>
+                    </button>
+                  </div>
+                </section>
+
+                <div
+                  class="project-card-grid"
+                  :class="{ 'project-card-grid--list': projectDisplayMode === 'list' }"
+                  aria-label="Список проектов"
+                >
+                  <article
+                    v-for="project in visibleProjects"
+                    :key="project.id"
+                    class="project-card"
+                  >
+                    <RouterLink
+                      class="project-card__link"
+                      :to="{ name: 'projects.show', params: { id: String(project.id) } }"
+                      :aria-label="`Открыть превью проекта ${project.title}`"
+                    >
+                      <span class="project-card__media">
+                        <img
+                          v-if="project.logo_url"
+                          class="project-card__image"
+                          :src="project.logo_url"
+                          :alt="`Изображение проекта ${project.title}`"
+                        />
+                        <span v-else class="project-card__placeholder">
+                          {{ project.title.slice(0, 1).toUpperCase() }}
+                        </span>
+                      </span>
+
+                      <span class="project-card__body">
+                        <span class="project-card__heading">
+                          <strong class="project-card__title">{{ project.title }}</strong>
+                          <span v-if="project.owner_name" class="project-card__author">
+                            by {{ project.owner_name }}
+                          </span>
+                        </span>
+                        <span class="project-card__summary">{{ projectSummary(project) }}</span>
+
+                        <span class="project-card__badges" aria-label="Теги проекта">
+                          <span
+                            v-for="tag in projectTags(project)"
+                            :key="tag"
+                            class="project-card__badge"
+                          >
+                            {{ tag }}
+                          </span>
+                        </span>
+
+                        <span class="project-card__footer">
+                          <span class="project-card__updated-at">{{
+                            projectUpdatedAt(project)
+                          }}</span>
+                        </span>
+                      </span>
+                    </RouterLink>
+
+                    <div class="project-card__actions" aria-label="Действия проекта">
+                      <span class="project-card__status" :class="projectStatusClass(project)">
+                        {{ project.status_label ?? project.status ?? 'Статус не указан' }}
+                      </span>
+                      <span class="project-card__updated-at project-card__updated-at--actions">
+                        <span>{{ projectUpdatedAt(project) }}</span>
+                        <Calendar :size="14" :stroke-width="1.9" aria-hidden="true" />
+                      </span>
+
+                      <RouterLink
+                        class="icon-action"
+                        :to="projectActionRoute(project)"
+                        :aria-label="projectActionLabel(project)"
+                        :title="projectActionLabel(project)"
+                        @click.stop
+                      >
+                        <PlayCircle
+                          v-if="projectIsDraft(project)"
+                          :size="16"
+                          :stroke-width="2"
+                          aria-hidden="true"
+                        />
+                        <Pencil v-else :size="16" :stroke-width="2" aria-hidden="true" />
+                      </RouterLink>
+
+                      <button
+                        v-if="project.can_delete"
+                        class="icon-action icon-action--danger"
+                        type="button"
+                        :disabled="deletingProjectId !== null"
+                        aria-label="Удалить проект"
+                        title="Удалить проект"
+                        @click.stop.prevent="openProjectDeleteModal(project)"
+                      >
+                        <Trash2 :size="16" :stroke-width="2" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </article>
+
+                  <div v-if="visibleProjects.length === 0" class="game-card-empty">
+                    Проекты не найдены
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </article>
+
         <Transition name="modal">
           <div
             v-if="isContentTypeModalOpen"
@@ -1784,6 +2727,24 @@ void loadGame()
             </section>
           </div>
         </Transition>
+
+        <DeleteModal
+          :open="isDeleteModalOpen"
+          title="Удалить игру?"
+          :description="deleteModalDescription"
+          :loading="isDeletingGame"
+          @cancel="closeGameDeleteModal"
+          @confirm="confirmDeleteGame"
+        />
+
+        <DeleteModal
+          :open="pendingDeleteProject !== null"
+          title="Удалить проект"
+          :description="projectDeleteModalDescription"
+          :loading="deletingProjectId !== null"
+          @cancel="closeProjectDeleteModal"
+          @confirm="confirmDeleteProject"
+        />
       </template>
     </section>
   </AppShell>
