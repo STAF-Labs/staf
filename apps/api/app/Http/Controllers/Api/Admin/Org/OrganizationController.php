@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin\Org;
 use App\Enums\CommonStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Org\OrganizationResource;
+use App\Models\Game\Project\Project;
 use App\Models\Org\Organization;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -105,8 +106,25 @@ class OrganizationController extends Controller
 
     public function show(Request $request, Organization $organization): JsonResponse
     {
+        $activityProjects = Project::query()
+            ->with([
+                'ownerable',
+                'gameContentType.game',
+                'gameContentType.contentType',
+                'dimensionValues',
+                'media',
+            ])
+            ->withCount('releases')
+            ->withMax('releases', 'released_at')
+            ->where('ownerable_type', Organization::class)
+            ->where('ownerable_id', $organization->id)
+            ->latest('id')
+            ->get();
+
+        $organization->setRelation('activityProjects', $activityProjects);
+
         return response()->json(
-            OrganizationResource::make($organization->load(['media', 'orgMembers.member']))->resolve($request)
+            OrganizationResource::make($organization->load(['media', 'orgMembers.member.userProfile.media']))->resolve($request)
         );
     }
 

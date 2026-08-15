@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources\Org;
 
+use App\Http\Resources\Game\Project\ProjectResource;
 use App\Models\Org\Organization;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -35,7 +36,11 @@ class OrganizationResource extends JsonResource
             'members' => $this->whenLoaded('orgMembers', fn (): array => $this->orgMembers
                 ->map(fn ($membership): array => [
                     'id' => $membership->id,
+                    'user_id' => $membership->member?->id,
                     'username' => $membership->member?->username,
+                    'display_name' => $membership->member?->userProfile?->display_name,
+                    'avatar_url' => $membership->member?->userProfile?->getFirstMediaUrl('avatar') ?: null,
+                    'email_verified_at' => $membership->member?->email_verified_at?->toISOString(),
                     'status' => $membership->status?->value,
                     'status_label' => $membership->status?->getLabel(),
                     'status_color' => $membership->status?->getColor(),
@@ -46,6 +51,10 @@ class OrganizationResource extends JsonResource
                 ])
                 ->values()
                 ->all()),
+            'projects' => $this->whenLoaded(
+                'activityProjects',
+                fn (): array => ProjectResource::collection($this->activityProjects)->resolve($request),
+            ),
         ];
     }
 }

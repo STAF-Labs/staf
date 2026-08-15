@@ -1,3 +1,5 @@
+import type { ProjectListItem } from './project'
+
 export type OrganizationListItem = {
   id: number
   name: string
@@ -19,7 +21,11 @@ export type OrganizationDetail = OrganizationListItem & {
   website_urls: unknown
   members: {
     id: number
+    user_id: number | null
     username: string | null
+    display_name: string | null
+    avatar_url: string | null
+    email_verified_at: string | null
     status: string | null
     status_label: string | null
     status_color: string | null
@@ -28,4 +34,5 @@ export type OrganizationDetail = OrganizationListItem & {
     role_label: string | null
     role_color: string | null
   }[]
+  projects: ProjectListItem[]
 }
