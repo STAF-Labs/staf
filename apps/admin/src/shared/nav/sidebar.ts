@@ -53,15 +53,15 @@ export const sidebarItems: SidebarItem[] = [
       },
       {
         type: 'link',
-        label: 'Типы контента',
-        routeName: 'content-types.index',
-        icon: Tags,
-      },
-      {
-        type: 'link',
         label: 'Проекты',
         routeName: 'projects.index',
         icon: FolderKanban,
+      },
+      {
+        type: 'link',
+        label: 'Типы контента',
+        routeName: 'content-types.index',
+        icon: Tags,
       },
     ],
   },

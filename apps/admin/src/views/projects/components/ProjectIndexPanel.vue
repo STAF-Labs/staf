@@ -1,0 +1,1338 @@
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue'
+import type { RouteLocationRaw } from 'vue-router'
+import { Calendar, Image, Info, Pencil, PlayCircle, Plus, RotateCcw, Trash2 } from '@lucide/vue'
+import SearchField from '@/components/ui/SearchField.vue'
+import type { GameDimension, GameDimensionValue, GameListItem } from '@/shared/games/games'
+import type {
+  ProjectContentTypeOption,
+  ProjectListItem,
+  ProjectStatus,
+} from '@/shared/projects/projects'
+
+type StatusFilter = ProjectStatus | 'all'
+type SortOption = 'title_asc' | 'title_desc' | 'released_at'
+type DisplayMode = 'cards' | 'list'
+
+const props = withDefaults(
+  defineProps<{
+    projects: ProjectListItem[]
+    games?: GameListItem[]
+    contentTypeOptions: ProjectContentTypeOption[]
+    dimensions: GameDimension[]
+    releaseDimensionValueIds: Record<number, number[]>
+    loading?: boolean
+    showAddCard?: boolean
+    enableDelete?: boolean
+    deletingProjectId?: number | null
+    restrictContentTypesToProjects?: boolean
+    emptyText?: string
+  }>(),
+  {
+    games: () => [],
+    loading: false,
+    showAddCard: false,
+    enableDelete: false,
+    deletingProjectId: null,
+    restrictContentTypesToProjects: false,
+    emptyText: 'Проекты не найдены.',
+  },
+)
+
+const emit = defineEmits<{
+  delete: [project: ProjectListItem]
+}>()
+
+const statusFilterOptions: Array<{ value: StatusFilter; label: string }> = [
+  { value: 'all', label: 'Все статусы' },
+  { value: 'draft', label: 'Черновик' },
+  { value: 'on_moderation', label: 'На модерации' },
+  { value: 'published', label: 'Опубликован' },
+  { value: 'rejected', label: 'Отклонён' },
+]
+const sortOptions: Array<{ value: SortOption; label: string }> = [
+  { value: 'title_asc', label: 'А-Я' },
+  { value: 'title_desc', label: 'Я-А' },
+  { value: 'released_at', label: 'Дата релиза' },
+]
+const pageSizeOptions = [10, 20, 30, 40, 50]
+
+const search = ref('')
+const gameFilter = ref('all')
+const contentTypeFilter = ref('all')
+const selectedProjectFilterValueIds = ref<Record<number, number[]>>({})
+const selectedReleaseFilterValueIds = ref<Record<number, number[]>>({})
+const releaseDateFrom = ref('')
+const releaseDateTo = ref('')
+const statusFilter = ref<StatusFilter>('all')
+const sort = ref<SortOption>('title_asc')
+const pageSize = ref(20)
+const displayMode = ref<DisplayMode>('cards')
+
+const projectContentTypeIds = computed(
+  () => new Set(props.projects.map((project) => project.game_content_type_id)),
+)
+const gameFilterOptions = computed(() => {
+  const games = new Map<number, string>()
+
+  for (const game of props.games) {
+    games.set(game.id, game.name)
+  }
+
+  for (const project of props.projects) {
+    if (project.game_id !== null && project.game_name) {
+      games.set(project.game_id, project.game_name)
+    }
+  }
+
+  return [
+    { value: 'all', label: 'Все игры' },
+    ...[...games.entries()]
+      .map(([id, name]) => ({ value: String(id), label: name }))
+      .sort((firstOption, secondOption) =>
+        firstOption.label.localeCompare(secondOption.label, 'ru-RU'),
+      ),
+  ]
+})
+const contentTypeFilterOptions = computed(() =>
+  props.contentTypeOptions
+    .filter(
+      (option) =>
+        !props.restrictContentTypesToProjects || projectContentTypeIds.value.has(option.id),
+    )
+    .filter((option) => gameFilter.value === 'all' || String(option.game_id) === gameFilter.value)
+    .map((option) => ({
+      value: String(option.id),
+      label:
+        gameFilter.value === 'all'
+          ? `${option.content_type_name ?? 'Тип контента'} · ${option.game_name ?? 'Игра'}`
+          : (option.content_type_name ?? 'Тип контента'),
+    }))
+    .sort((firstOption, secondOption) =>
+      firstOption.label.localeCompare(secondOption.label, 'ru-RU'),
+    ),
+)
+const projectFilterDimensions = computed(() =>
+  props.dimensions.filter(
+    (dimension) =>
+      dimension.is_active &&
+      dimension.is_filterable &&
+      dimension.applies_to === 'project' &&
+      contentTypeFilter.value !== 'all' &&
+      String(dimension.game_content_type_id) === contentTypeFilter.value,
+  ),
+)
+const releaseFilterDimensions = computed(() =>
+  props.dimensions.filter(
+    (dimension) =>
+      dimension.is_active &&
+      dimension.is_filterable &&
+      dimension.applies_to === 'release' &&
+      contentTypeFilter.value !== 'all' &&
+      String(dimension.game_content_type_id) === contentTypeFilter.value,
+  ),
+)
+const hasActiveFilters = computed(() =>
+  Boolean(
+    search.value.trim() ||
+    gameFilter.value !== 'all' ||
+    contentTypeFilter.value !== 'all' ||
+    releaseDateFrom.value ||
+    releaseDateTo.value ||
+    statusFilter.value !== 'all' ||
+    hasSelectedFilterValues(selectedProjectFilterValueIds.value) ||
+    hasSelectedFilterValues(selectedReleaseFilterValueIds.value),
+  ),
+)
+const filteredProjects = computed(() =>
+  props.projects.filter(
+    (project) =>
+      matchesSearch(project) &&
+      matchesGameFilter(project) &&
+      matchesContentTypeFilter(project) &&
+      matchesReleaseDateFilter(project) &&
+      matchesStatusFilter(project) &&
+      matchesProjectDimensionFilters(project) &&
+      matchesReleaseDimensionFilters(project),
+  ),
+)
+const sortedProjects = computed(() =>
+  [...filteredProjects.value].sort((firstProject, secondProject) => {
+    if (sort.value === 'title_desc') {
+      return secondProject.title.localeCompare(firstProject.title, 'ru-RU')
+    }
+
+    if (sort.value === 'released_at') {
+      return releaseTimestamp(secondProject) - releaseTimestamp(firstProject)
+    }
+
+    return firstProject.title.localeCompare(secondProject.title, 'ru-RU')
+  }),
+)
+const visibleProjects = computed(() => sortedProjects.value.slice(0, pageSize.value))
+
+function matchesSearch(project: ProjectListItem): boolean {
+  const searchQuery = search.value.trim().toLocaleLowerCase('ru-RU')
+
+  return searchQuery === '' || project.title.toLocaleLowerCase('ru-RU').includes(searchQuery)
+}
+
+function matchesGameFilter(project: ProjectListItem): boolean {
+  return gameFilter.value === 'all' || String(project.game_id) === gameFilter.value
+}
+
+function matchesContentTypeFilter(project: ProjectListItem): boolean {
+  return (
+    contentTypeFilter.value === 'all' ||
+    String(project.game_content_type_id) === contentTypeFilter.value
+  )
+}
+
+function matchesReleaseDateFilter(project: ProjectListItem): boolean {
+  if (!releaseDateFrom.value && !releaseDateTo.value) {
+    return true
+  }
+
+  if (!project.released_at) {
+    return false
+  }
+
+  const releaseDate = new Date(project.released_at)
+  releaseDate.setHours(0, 0, 0, 0)
+
+  if (releaseDateFrom.value) {
+    const dateFrom = new Date(releaseDateFrom.value)
+    dateFrom.setHours(0, 0, 0, 0)
+
+    if (releaseDate < dateFrom) {
+      return false
+    }
+  }
+
+  if (releaseDateTo.value) {
+    const dateTo = new Date(releaseDateTo.value)
+    dateTo.setHours(0, 0, 0, 0)
+
+    if (releaseDate > dateTo) {
+      return false
+    }
+  }
+
+  return true
+}
+
+function matchesStatusFilter(project: ProjectListItem): boolean {
+  return statusFilter.value === 'all' || project.status === statusFilter.value
+}
+
+function matchesProjectDimensionFilters(project: ProjectListItem): boolean {
+  const projectValueIds = new Set(project.dimension_value_ids ?? [])
+
+  return Object.values(selectedProjectFilterValueIds.value).every((valueIds) => {
+    return valueIds.length === 0 || valueIds.some((valueId) => projectValueIds.has(valueId))
+  })
+}
+
+function matchesReleaseDimensionFilters(project: ProjectListItem): boolean {
+  const releaseValueIds = new Set(props.releaseDimensionValueIds[project.id] ?? [])
+
+  return Object.values(selectedReleaseFilterValueIds.value).every((valueIds) => {
+    return valueIds.length === 0 || valueIds.some((valueId) => releaseValueIds.has(valueId))
+  })
+}
+
+function hasSelectedFilterValues(filtersState: Record<number, number[]>): boolean {
+  return Object.values(filtersState).some((valueIds) => valueIds.length > 0)
+}
+
+function sidebarFilterSelectedValueCount(filterId: number, target: 'project' | 'release'): number {
+  const filtersState =
+    target === 'project' ? selectedProjectFilterValueIds.value : selectedReleaseFilterValueIds.value
+
+  return filtersState[filterId]?.length ?? 0
+}
+
+function toggleSidebarFilterValue(
+  filterId: number,
+  valueId: number,
+  target: 'project' | 'release',
+): void {
+  const filtersState =
+    target === 'project' ? selectedProjectFilterValueIds.value : selectedReleaseFilterValueIds.value
+  const selectedValueIds = filtersState[filterId] ?? []
+
+  filtersState[filterId] = selectedValueIds.includes(valueId)
+    ? selectedValueIds.filter((selectedValueId) => selectedValueId !== valueId)
+    : [...selectedValueIds, valueId]
+}
+
+function sidebarFilterValueIsSelected(
+  filterId: number,
+  valueId: number,
+  target: 'project' | 'release',
+): boolean {
+  const filtersState =
+    target === 'project' ? selectedProjectFilterValueIds.value : selectedReleaseFilterValueIds.value
+
+  return filtersState[filterId]?.includes(valueId) ?? false
+}
+
+function sidebarRootValues(filter: GameDimension): GameDimensionValue[] {
+  return filter.values
+    .filter((value) => value.is_active && value.parent_id === null)
+    .sort(compareDimensionValueOrder)
+}
+
+function sidebarChildValues(
+  filter: GameDimension,
+  parentValue: GameDimensionValue,
+): GameDimensionValue[] {
+  return filter.values
+    .filter((value) => value.is_active && value.parent_id === parentValue.id)
+    .sort(compareDimensionValueOrder)
+}
+
+function sidebarValueHasChildren(filter: GameDimension, value: GameDimensionValue): boolean {
+  return filter.values.some(
+    (childValue) => childValue.is_active && childValue.parent_id === value.id,
+  )
+}
+
+function compareDimensionValueOrder(
+  firstValue: GameDimensionValue,
+  secondValue: GameDimensionValue,
+): number {
+  if (firstValue.sort_order !== secondValue.sort_order) {
+    return firstValue.sort_order - secondValue.sort_order
+  }
+
+  return firstValue.name.localeCompare(secondValue.name, 'ru-RU')
+}
+
+function releaseTimestamp(project: ProjectListItem): number {
+  return project.released_at ? new Date(project.released_at).getTime() : 0
+}
+
+function projectSummary(project: ProjectListItem): string {
+  return richTextToPlainText(project.summary) || 'Краткое описание пока не добавлено.'
+}
+
+function projectTags(project: ProjectListItem): string[] {
+  if (!Array.isArray(project.tags)) {
+    return []
+  }
+
+  return project.tags.filter((tag): tag is string => typeof tag === 'string' && tag.trim() !== '')
+}
+
+function projectUpdatedAt(project: ProjectListItem): string {
+  if (!project.updated_at) {
+    return 'Дата не указана'
+  }
+
+  return new Intl.DateTimeFormat('ru-RU', { dateStyle: 'short' }).format(
+    new Date(project.updated_at),
+  )
+}
+
+function projectStatusClass(project: ProjectListItem): string {
+  const color = project.status_color ?? 'gray'
+
+  return ['gray', 'warning', 'success', 'danger'].includes(color)
+    ? `project-card__status--${color}`
+    : 'project-card__status--gray'
+}
+
+function projectIsDraft(project: ProjectListItem): boolean {
+  return project.status === 'draft'
+}
+
+function projectActionRoute(project: ProjectListItem): RouteLocationRaw {
+  return projectIsDraft(project)
+    ? { name: 'projects.continue', params: { id: String(project.id) } }
+    : { name: 'projects.edit', params: { id: String(project.id) } }
+}
+
+function projectActionLabel(project: ProjectListItem): string {
+  return projectIsDraft(project) ? 'Продолжить создание' : 'Редактировать проект'
+}
+
+function richTextToPlainText(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.map(richTextToPlainText).filter(Boolean).join(' ')
+  }
+
+  if (!value || typeof value !== 'object') {
+    return ''
+  }
+
+  if ('text' in value && typeof value.text === 'string') {
+    return value.text
+  }
+
+  return 'content' in value ? richTextToPlainText(value.content) : ''
+}
+
+function resetFilters(): void {
+  search.value = ''
+  gameFilter.value = 'all'
+  contentTypeFilter.value = 'all'
+  selectedProjectFilterValueIds.value = {}
+  selectedReleaseFilterValueIds.value = {}
+  releaseDateFrom.value = ''
+  releaseDateTo.value = ''
+  statusFilter.value = 'all'
+}
+
+function toggleDisplayMode(): void {
+  displayMode.value = displayMode.value === 'cards' ? 'list' : 'cards'
+}
+
+watch(gameFilter, () => {
+  contentTypeFilter.value = 'all'
+})
+
+watch(contentTypeFilter, () => {
+  selectedProjectFilterValueIds.value = {}
+  selectedReleaseFilterValueIds.value = {}
+})
+</script>
+
+<template>
+  <div class="projects-index-layout">
+    <aside class="project-filter-sidebar" aria-label="Фильтры проектов">
+      <details class="project-filter-block" open>
+        <summary class="project-filter-block__summary">
+          <span>Тип контента</span>
+          <span v-if="contentTypeFilter !== 'all'">1</span>
+        </summary>
+
+        <div class="project-filter-block__list">
+          <label class="project-filter-option">
+            <input
+              v-model="contentTypeFilter"
+              type="radio"
+              name="project-content-type-filter"
+              value="all"
+            />
+            <span>Все типы</span>
+          </label>
+          <label
+            v-for="option in contentTypeFilterOptions"
+            :key="option.value"
+            class="project-filter-option"
+          >
+            <input
+              v-model="contentTypeFilter"
+              type="radio"
+              name="project-content-type-filter"
+              :value="option.value"
+            />
+            <span>{{ option.label }}</span>
+          </label>
+        </div>
+      </details>
+
+      <aside
+        v-if="contentTypeFilter === 'all'"
+        class="project-filter-note"
+        aria-label="Информация о фильтрах проектов"
+      >
+        <span class="project-filter-note__icon" aria-hidden="true">
+          <Info :size="21" :stroke-width="2" />
+        </span>
+        <div>
+          <strong>Фильтры проектов</strong>
+          <p>Выберите тип контента, чтобы увидеть проектные и релизные фильтры.</p>
+        </div>
+      </aside>
+
+      <template v-else>
+        <details
+          v-for="filter in projectFilterDimensions"
+          :key="`project-filter-${filter.id}`"
+          class="project-filter-block"
+        >
+          <summary class="project-filter-block__summary">
+            <span>{{ filter.name }}</span>
+            <span v-if="sidebarFilterSelectedValueCount(filter.id, 'project')">
+              {{ sidebarFilterSelectedValueCount(filter.id, 'project') }}
+            </span>
+          </summary>
+
+          <div class="project-filter-block__list">
+            <template v-for="value in sidebarRootValues(filter)" :key="value.id">
+              <details v-if="sidebarValueHasChildren(filter, value)" class="project-filter-group">
+                <summary class="project-filter-group__summary">{{ value.name }}</summary>
+
+                <label
+                  v-for="childValue in sidebarChildValues(filter, value)"
+                  :key="childValue.id"
+                  class="project-filter-option project-filter-option--child"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="sidebarFilterValueIsSelected(filter.id, childValue.id, 'project')"
+                    @change="toggleSidebarFilterValue(filter.id, childValue.id, 'project')"
+                  />
+                  <span>{{ childValue.name }}</span>
+                </label>
+              </details>
+
+              <label v-else class="project-filter-option">
+                <input
+                  type="checkbox"
+                  :checked="sidebarFilterValueIsSelected(filter.id, value.id, 'project')"
+                  @change="toggleSidebarFilterValue(filter.id, value.id, 'project')"
+                />
+                <span>{{ value.name }}</span>
+              </label>
+            </template>
+          </div>
+        </details>
+
+        <details
+          v-for="filter in releaseFilterDimensions"
+          :key="`release-filter-${filter.id}`"
+          class="project-filter-block"
+        >
+          <summary class="project-filter-block__summary">
+            <span>{{ filter.name }}</span>
+            <span v-if="sidebarFilterSelectedValueCount(filter.id, 'release')">
+              {{ sidebarFilterSelectedValueCount(filter.id, 'release') }}
+            </span>
+          </summary>
+
+          <div class="project-filter-block__list">
+            <template v-for="value in sidebarRootValues(filter)" :key="value.id">
+              <details v-if="sidebarValueHasChildren(filter, value)" class="project-filter-group">
+                <summary class="project-filter-group__summary">{{ value.name }}</summary>
+
+                <label
+                  v-for="childValue in sidebarChildValues(filter, value)"
+                  :key="childValue.id"
+                  class="project-filter-option project-filter-option--child"
+                >
+                  <input
+                    type="checkbox"
+                    :checked="sidebarFilterValueIsSelected(filter.id, childValue.id, 'release')"
+                    @change="toggleSidebarFilterValue(filter.id, childValue.id, 'release')"
+                  />
+                  <span>{{ childValue.name }}</span>
+                </label>
+              </details>
+
+              <label v-else class="project-filter-option">
+                <input
+                  type="checkbox"
+                  :checked="sidebarFilterValueIsSelected(filter.id, value.id, 'release')"
+                  @change="toggleSidebarFilterValue(filter.id, value.id, 'release')"
+                />
+                <span>{{ value.name }}</span>
+              </label>
+            </template>
+          </div>
+        </details>
+      </template>
+
+      <details class="project-filter-block">
+        <summary class="project-filter-block__summary">
+          <span>Параметры</span>
+        </summary>
+
+        <div class="project-filter-block__fields">
+          <label class="game-filter-field">
+            <span class="game-filter-field__label">Сортировка</span>
+            <select v-model="sort" class="game-filter-field__control">
+              <option v-for="option in sortOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+
+          <label class="game-filter-field">
+            <span class="game-filter-field__label">Вид</span>
+            <select v-model="pageSize" class="game-filter-field__control">
+              <option v-for="option in pageSizeOptions" :key="option" :value="option">
+                {{ option }}
+              </option>
+            </select>
+          </label>
+        </div>
+      </details>
+    </aside>
+
+    <div class="projects-index-content">
+      <section class="game-filters" aria-label="Фильтры проектов">
+        <div class="game-filter-top">
+          <SearchField v-model="search" placeholder="Поиск по названию" />
+        </div>
+
+        <div class="game-filter-row game-filter-row--projects projects-index-filter-row">
+          <label class="game-filter-field">
+            <span class="game-filter-field__label">Игра</span>
+            <select v-model="gameFilter" class="game-filter-field__control">
+              <option v-for="option in gameFilterOptions" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+
+          <label class="game-filter-field">
+            <span class="game-filter-field__label">Дата релиза</span>
+            <span class="game-filter-date-range">
+              <input
+                v-model="releaseDateFrom"
+                class="game-filter-date-range__input"
+                type="date"
+                :max="releaseDateTo || undefined"
+                aria-label="Дата релиза от"
+              />
+              <span class="game-filter-date-range__separator">-</span>
+              <input
+                v-model="releaseDateTo"
+                class="game-filter-date-range__input"
+                type="date"
+                :min="releaseDateFrom || undefined"
+                aria-label="Дата релиза до"
+              />
+            </span>
+          </label>
+
+          <label class="game-filter-field">
+            <span class="game-filter-field__label">Статус</span>
+            <select v-model="statusFilter" class="game-filter-field__control">
+              <option
+                v-for="option in statusFilterOptions"
+                :key="option.value"
+                :value="option.value"
+              >
+                {{ option.label }}
+              </option>
+            </select>
+          </label>
+
+          <button
+            class="project-display-mode"
+            type="button"
+            :aria-pressed="displayMode === 'list'"
+            :title="displayMode === 'cards' ? 'Показать списком' : 'Показать карточками'"
+            :aria-label="displayMode === 'cards' ? 'Показать списком' : 'Показать карточками'"
+            @click="toggleDisplayMode"
+          >
+            <Image :size="18" :stroke-width="1.9" aria-hidden="true" />
+          </button>
+
+          <button
+            class="game-filter-reset"
+            type="button"
+            :disabled="!hasActiveFilters"
+            title="Сбросить фильтры"
+            @click="resetFilters"
+          >
+            <RotateCcw :size="18" :stroke-width="1.9" aria-hidden="true" />
+            <span>Сбросить</span>
+          </button>
+        </div>
+      </section>
+
+      <div
+        class="project-card-grid"
+        :class="{ 'project-card-grid--list': displayMode === 'list' }"
+        aria-label="Список проектов"
+      >
+        <RouterLink
+          v-if="showAddCard"
+          class="project-card project-card--add"
+          :to="{ name: 'projects.create' }"
+          aria-label="Добавить проект"
+        >
+          <span class="project-card__add-media" aria-hidden="true"></span>
+          <Plus class="project-card__add-icon" :size="58" :stroke-width="2.1" aria-hidden="true" />
+        </RouterLink>
+
+        <div v-if="loading" class="project-card project-card--loading">Загрузка...</div>
+        <div v-else-if="visibleProjects.length === 0" class="project-card project-card--loading">
+          {{ emptyText }}
+        </div>
+
+        <article v-for="project in visibleProjects" v-else :key="project.id" class="project-card">
+          <RouterLink
+            class="project-card__link"
+            :to="{ name: 'projects.show', params: { id: String(project.id) } }"
+            :aria-label="`Открыть превью проекта ${project.title}`"
+          >
+            <span class="project-card__media">
+              <img
+                v-if="project.logo_url"
+                class="project-card__image"
+                :src="project.logo_url"
+                :alt="`Изображение проекта ${project.title}`"
+              />
+              <span v-else class="project-card__placeholder">
+                {{ project.title.slice(0, 1).toUpperCase() }}
+              </span>
+            </span>
+
+            <span class="project-card__body">
+              <span class="project-card__heading">
+                <strong class="project-card__title">{{ project.title }}</strong>
+                <span v-if="project.owner_name" class="project-card__author">
+                  by {{ project.owner_name }}
+                </span>
+              </span>
+              <span class="project-card__summary">{{ projectSummary(project) }}</span>
+
+              <span class="project-card__badges" aria-label="Теги проекта">
+                <span v-for="tag in projectTags(project)" :key="tag" class="project-card__badge">
+                  {{ tag }}
+                </span>
+              </span>
+
+              <span class="project-card__footer">
+                <span class="project-card__updated-at">{{ projectUpdatedAt(project) }}</span>
+              </span>
+            </span>
+          </RouterLink>
+
+          <div class="project-card__actions" aria-label="Действия проекта">
+            <span class="project-card__status" :class="projectStatusClass(project)">
+              {{ project.status_label ?? project.status ?? 'Статус не указан' }}
+            </span>
+            <span class="project-card__updated-at project-card__updated-at--actions">
+              <span>{{ projectUpdatedAt(project) }}</span>
+              <Calendar :size="14" :stroke-width="1.9" aria-hidden="true" />
+            </span>
+
+            <RouterLink
+              class="icon-action"
+              :to="projectActionRoute(project)"
+              :aria-label="projectActionLabel(project)"
+              :title="projectActionLabel(project)"
+              @click.stop
+            >
+              <PlayCircle
+                v-if="projectIsDraft(project)"
+                :size="16"
+                :stroke-width="2"
+                aria-hidden="true"
+              />
+              <Pencil v-else :size="16" :stroke-width="2" aria-hidden="true" />
+            </RouterLink>
+
+            <button
+              v-if="enableDelete && project.can_delete"
+              class="icon-action icon-action--danger"
+              type="button"
+              :disabled="deletingProjectId !== null"
+              aria-label="Удалить проект"
+              title="Удалить проект"
+              @click.stop.prevent="emit('delete', project)"
+            >
+              <Trash2 :size="16" :stroke-width="2" aria-hidden="true" />
+            </button>
+          </div>
+        </article>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.projects-index-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.projects-index-content {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.project-filter-sidebar {
+  position: sticky;
+  top: 16px;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.project-filter-block {
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+}
+
+.project-filter-block__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 12px;
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 850;
+  list-style: none;
+}
+
+.project-filter-block__summary::-webkit-details-marker {
+  display: none;
+}
+
+.project-filter-block__summary::after {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  content: '';
+  border-right: 2px solid var(--color-text-muted);
+  border-bottom: 2px solid var(--color-text-muted);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 160ms ease;
+}
+
+.project-filter-block[open] .project-filter-block__summary::after {
+  transform: rotate(225deg) translateY(-2px);
+}
+
+.project-filter-block__summary > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-filter-block__summary > span:last-child:not(:first-child) {
+  display: grid;
+  min-width: 24px;
+  height: 24px;
+  place-items: center;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 24%, var(--color-border-soft));
+  border-radius: 999px;
+  font-size: 12px;
+}
+
+.project-filter-block__list,
+.project-filter-block__fields {
+  display: grid;
+  gap: 6px;
+  max-height: 230px;
+  overflow-y: auto;
+  padding: 0 10px 10px;
+}
+
+.project-filter-block__fields {
+  gap: 10px;
+}
+
+.project-filter-option {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  min-height: 34px;
+  padding: 6px 8px;
+  color: var(--color-text);
+  background: var(--color-bg-soft);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.project-filter-option:hover {
+  background: var(--color-surface-hover);
+}
+
+.project-filter-option input {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--color-primary);
+}
+
+.project-filter-option span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.project-filter-note {
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  padding: 16px;
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-info) 8%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-info) 24%, var(--color-border));
+  border-radius: var(--radius-md);
+}
+
+.project-filter-note__icon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  color: var(--color-info);
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  border-radius: 50%;
+}
+
+.project-filter-note strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.project-filter-note p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.project-filter-group {
+  overflow: hidden;
+  background: var(--color-bg-soft);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+}
+
+.project-filter-group__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 34px;
+  padding: 6px 8px;
+  color: var(--color-text);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 800;
+  list-style: none;
+}
+
+.project-filter-group__summary::-webkit-details-marker {
+  display: none;
+}
+
+.project-filter-group__summary::after {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  content: '';
+  border-right: 2px solid var(--color-text-muted);
+  border-bottom: 2px solid var(--color-text-muted);
+  transform: rotate(45deg) translateY(-2px);
+  transition: transform 160ms ease;
+}
+
+.project-filter-group[open] .project-filter-group__summary::after {
+  transform: rotate(225deg) translateY(-2px);
+}
+
+.project-filter-option--child {
+  margin: 0 6px 6px;
+  background: var(--color-surface);
+}
+
+.projects-index-filter-row {
+  display: grid;
+  grid-template-columns:
+    minmax(180px, 240px) minmax(240px, 320px) minmax(180px, 240px) 42px
+    minmax(120px, auto);
+  align-items: end;
+}
+
+.projects-index-filter-row .game-filter-reset {
+  justify-self: end;
+  margin-left: 0;
+}
+
+.game-filter-row--projects .game-filter-reset {
+  margin-left: auto;
+}
+
+.project-display-mode {
+  display: inline-grid;
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  align-self: end;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.project-display-mode:hover {
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+}
+
+.project-display-mode[aria-pressed='true'] {
+  color: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-primary) 48%, var(--color-border));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+.project-card-grid--list {
+  display: grid;
+  grid-template-columns: minmax(0, 1600px);
+  gap: 10px;
+  align-items: start;
+  justify-content: start;
+}
+
+.project-card:not(.project-card--add, .project-card--loading) {
+  min-height: 0;
+  aspect-ratio: auto;
+  background: var(--color-surface);
+}
+
+.project-card:not(.project-card--add, .project-card--loading):hover,
+.project-card:not(.project-card--add, .project-card--loading):focus-within {
+  transform: translateY(-2px);
+}
+
+.project-card--add {
+  grid-template-rows: auto 176px;
+  place-items: stretch;
+  min-height: 0;
+  padding: 0;
+  aspect-ratio: auto;
+}
+
+.project-card__add-media {
+  width: 100%;
+  aspect-ratio: 16 / 8;
+}
+
+.project-card--add .project-card__add-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.project-card__link {
+  display: grid;
+  grid-template-rows: auto 176px;
+}
+
+.project-card__actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+}
+
+.project-card__status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 10px;
+  color: var(--color-primary-text);
+  background: color-mix(in srgb, var(--color-surface) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.project-card__status--gray {
+  color: var(--color-text-muted);
+}
+
+.project-card__status--warning {
+  color: var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-warning) 42%, transparent);
+}
+
+.project-card__status--success {
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 42%, transparent);
+}
+
+.project-card__status--danger {
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 42%, transparent);
+}
+
+.project-card__media {
+  height: auto;
+  min-height: 0;
+  aspect-ratio: 16 / 8;
+  background:
+    linear-gradient(
+      145deg,
+      transparent 42%,
+      color-mix(in srgb, var(--color-text) 5%, transparent) 43% 57%,
+      transparent 58%
+    ),
+    linear-gradient(
+      35deg,
+      var(--color-bg-soft),
+      color-mix(in srgb, var(--color-text) 7%, var(--color-bg-soft))
+    );
+  border-bottom: 1px solid var(--color-border-soft);
+  border-radius: 0;
+}
+
+.project-card__media::after {
+  display: none;
+}
+
+.project-card__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.project-card__placeholder {
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-surface) 78%, transparent);
+  border: 1px solid var(--color-border-soft);
+  border-radius: var(--radius-md);
+  font-size: 26px;
+}
+
+.project-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  padding: 16px;
+}
+
+.project-card__heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.project-card__title {
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+.project-card__author {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-card__summary {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 16px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.project-card__badges {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  min-height: 26px;
+  overflow: hidden;
+  padding-top: 3px;
+}
+
+.project-card__badge {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  min-height: 26px;
+  padding: 3px 9px;
+  color: var(--color-primary-text);
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.project-card__footer {
+  display: flex;
+  align-items: end;
+  justify-content: flex-end;
+  min-height: 20px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.project-card__updated-at {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.project-card__updated-at--actions {
+  display: none;
+}
+
+.project-card-grid--list .project-card:not(.project-card--add, .project-card--loading) {
+  min-height: 128px;
+}
+
+.project-card-grid--list .project-card:not(.project-card--add, .project-card--loading):hover,
+.project-card-grid--list
+  .project-card:not(.project-card--add, .project-card--loading):focus-within {
+  transform: translateY(-1px);
+}
+
+.project-card-grid--list .project-card--add {
+  grid-template-rows: none;
+  width: auto;
+  min-height: 76px;
+}
+
+.project-card-grid--list .project-card--add .project-card__add-media {
+  aspect-ratio: auto;
+  min-height: 76px;
+}
+
+.project-card-grid--list .project-card__link {
+  min-height: 128px;
+  grid-template-columns: 132px minmax(0, 1fr);
+  grid-template-rows: none;
+}
+
+.project-card-grid--list .project-card__media {
+  width: 132px;
+  min-height: 100%;
+  padding: 10px;
+  aspect-ratio: auto;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border-soft);
+  border-bottom: 0;
+}
+
+.project-card-grid--list .project-card__image {
+  border-radius: var(--radius-md);
+}
+
+.project-card-grid--list .project-card__placeholder {
+  width: 54px;
+  height: 54px;
+  font-size: 24px;
+}
+
+.project-card-grid--list .project-card__body {
+  min-height: 128px;
+  padding: 14px 310px 14px 18px;
+}
+
+.project-card-grid--list .project-card__heading {
+  padding-right: 16px;
+}
+
+.project-card-grid--list .project-card__title {
+  font-size: 18px;
+}
+
+.project-card-grid--list .project-card__summary {
+  max-width: 780px;
+  font-size: 14px;
+  -webkit-line-clamp: 2;
+}
+
+.project-card-grid--list .project-card__badges {
+  min-height: 24px;
+}
+
+.project-card-grid--list .project-card__badge {
+  min-height: 22px;
+  padding: 2px 8px;
+}
+
+.project-card-grid--list .project-card__footer {
+  display: none;
+}
+
+.project-card-grid--list .project-card__updated-at--actions {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 9px;
+  background: color-mix(in srgb, var(--color-surface) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  font-weight: 700;
+}
+
+.project-card-grid--list .project-card__actions {
+  top: 12px;
+  right: 12px;
+  max-width: 320px;
+}
+
+@media (max-width: 860px) {
+  .projects-index-layout,
+  .projects-index-filter-row {
+    grid-template-columns: 1fr;
+  }
+
+  .project-filter-sidebar {
+    position: static;
+  }
+
+  .projects-index-filter-row .game-filter-reset {
+    justify-self: stretch;
+  }
+
+  .project-card-grid--list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .project-card-grid--list .project-card__link {
+    grid-template-columns: 104px minmax(0, 1fr);
+  }
+
+  .project-card-grid--list .project-card__media {
+    width: 104px;
+  }
+
+  .project-card-grid--list .project-card__body {
+    padding-right: 16px;
+  }
+
+  .project-card-grid--list .project-card__actions {
+    position: static;
+    justify-content: flex-end;
+    max-width: none;
+    padding: 0 12px 12px;
+  }
+}
+</style>
