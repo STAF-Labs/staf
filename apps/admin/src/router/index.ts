@@ -8,6 +8,8 @@ import {
 import ContentTypesImportView from '@/views/content-types/ContentTypesImportView.vue'
 import ContentTypesView from '@/views/content-types/ContentTypesView.vue'
 import DashboardView from '../views/dashboard/DashboardView.vue'
+import DebugDashboardView from '@/views/debug/DebugDashboardView.vue'
+import DebugNotificationsView from '@/views/debug/DebugNotificationsView.vue'
 import LoginView from '../views/auth/LoginView.vue'
 import UsersView from '../views/users/UsersView.vue'
 import GameFormView from '@/views/games/GameFormView.vue'
@@ -51,6 +53,31 @@ const router = createRouter({
         },
         requiresAuth: true,
         title: 'Главная',
+      },
+    },
+    {
+      path: '/debug',
+      name: 'debug.dashboard',
+      component: DebugDashboardView,
+      meta: {
+        breadcrumb: {
+          label: 'Debug',
+        },
+        requiresAuth: true,
+        title: 'Debug',
+      },
+    },
+    {
+      path: '/debug/notifications',
+      name: 'debug.notifications',
+      component: DebugNotificationsView,
+      meta: {
+        breadcrumb: {
+          label: 'Уведомления',
+          parentName: 'debug.dashboard',
+        },
+        requiresAuth: true,
+        title: 'Debug уведомления',
       },
     },
     {

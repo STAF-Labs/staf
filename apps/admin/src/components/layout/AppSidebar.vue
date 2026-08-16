@@ -3,12 +3,19 @@ import { ChevronDown, PanelLeftClose, PanelLeftOpen } from '@lucide/vue'
 import { computed, ref, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import ThemeToggler from '@/components/ui/ThemeToggler.vue'
-import { sidebarItems, type SidebarGroupItem } from '@/shared/nav/sidebar'
+import { sidebarItems, type SidebarGroupItem, type SidebarItem } from '@/shared/nav/sidebar'
 import logoUrl from '@staf/assets/images/logo.svg'
 
-defineProps<{
+const props = withDefaults(defineProps<{
   collapsed: boolean
-}>()
+  items?: SidebarItem[]
+  navLabel?: string
+  openedGroupsStorageKey?: string
+}>(), {
+  items: () => sidebarItems,
+  navLabel: 'Основная навигация',
+  openedGroupsStorageKey: 'app-sidebar.opened-groups',
+})
 
 const emit = defineEmits<{
   toggle: []
@@ -16,10 +23,8 @@ const emit = defineEmits<{
 
 const route = useRoute()
 
-const openedGroupsStorageKey = 'app-sidebar.opened-groups'
-
 const openedGroups = ref<Record<string, boolean>>(
-  JSON.parse(localStorage.getItem(openedGroupsStorageKey) ?? '{}'),
+  JSON.parse(localStorage.getItem(props.openedGroupsStorageKey) ?? '{}'),
 )
 
 const activeRouteName = computed(() => String(route.name ?? ''))
@@ -42,21 +47,21 @@ function isGroupActive(group: SidebarGroupItem): boolean {
 watch(
   openedGroups,
   (value) => {
-    localStorage.setItem(openedGroupsStorageKey, JSON.stringify(value))
+    localStorage.setItem(props.openedGroupsStorageKey, JSON.stringify(value))
   },
   { deep: true },
 )
 </script>
 
 <template>
-  <aside class="app-sidebar" :class="{ 'is-collapsed': collapsed }">
+  <aside class="app-sidebar" :class="{ 'is-collapsed': props.collapsed }">
     <div class="app-sidebar__logo" aria-label="Место для логотипа">
       <img :src="logoUrl" alt="STAF gaming" class="app-sidebar__logo-image">
       <ThemeToggler class="app-sidebar__theme-toggle" />
     </div>
 
-    <nav class="app-sidebar__nav" aria-label="Основная навигация">
-      <template v-for="item in sidebarItems" :key="item.type === 'group' ? item.key : item.routeName">
+    <nav class="app-sidebar__nav" :aria-label="props.navLabel">
+      <template v-for="item in props.items" :key="item.type === 'group' ? item.key : item.routeName">
         <RouterLink
           v-if="item.type === 'link'"
           class="app-sidebar__link"
@@ -104,10 +109,10 @@ watch(
       <button
         type="button"
         class="app-sidebar__collapse"
-        :aria-label="collapsed ? 'Раскрыть меню' : 'Свернуть меню'"
+        :aria-label="props.collapsed ? 'Раскрыть меню' : 'Свернуть меню'"
         @click="emit('toggle')"
       >
-        <PanelLeftOpen v-if="collapsed" :size="20" :stroke-width="1.9" aria-hidden="true" />
+        <PanelLeftOpen v-if="props.collapsed" :size="20" :stroke-width="1.9" aria-hidden="true" />
         <PanelLeftClose v-else :size="20" :stroke-width="1.9" aria-hidden="true" />
       </button>
     </div>
