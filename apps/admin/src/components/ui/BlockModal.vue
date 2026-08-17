@@ -9,11 +9,13 @@ withDefaults(defineProps<{
   cancelText?: string
   confirmText?: string
   loading?: boolean
+  tone?: 'danger' | 'info' | 'warning'
 }>(), {
   icon: 'ban',
   cancelText: 'Отмена',
   confirmText: 'Заблокировать',
   loading: false,
+  tone: 'danger',
 })
 
 const emit = defineEmits<{
@@ -34,7 +36,11 @@ const emit = defineEmits<{
         aria-labelledby="block-modal-title"
       >
         <div class="modal__content">
-          <div class="modal__icon block-modal__icon" aria-hidden="true">
+          <div
+            class="modal__icon block-modal__icon"
+            :class="`block-modal__icon--${tone}`"
+            aria-hidden="true"
+          >
             <Snowflake v-if="icon === 'snowflake'" :size="34" :stroke-width="1.9" />
             <Ban v-else :size="34" :stroke-width="1.9" />
           </div>
@@ -56,7 +62,8 @@ const emit = defineEmits<{
           </button>
 
           <button
-            class="modal__button block-modal__button--warning"
+            class="modal__button"
+            :class="`block-modal__button--${tone}`"
             type="button"
             :disabled="loading"
             @click="emit('confirm')"
@@ -70,14 +77,36 @@ const emit = defineEmits<{
 </template>
 
 <style scoped>
-.block-modal__icon {
+.block-modal__icon--warning {
   color: var(--color-warning);
   background: color-mix(in srgb, var(--color-warning) 12%, transparent);
   border: 1px solid color-mix(in srgb, var(--color-warning) 34%, transparent);
 }
 
+.block-modal__icon--info {
+  color: var(--color-info);
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-info) 34%, transparent);
+}
+
+.block-modal__icon--danger {
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 28%, transparent);
+}
+
 .block-modal__button--warning {
   color: var(--color-primary-text);
   background: var(--color-warning);
+}
+
+.block-modal__button--info {
+  color: var(--color-primary-text);
+  background: var(--color-info);
+}
+
+.block-modal__button--danger {
+  color: var(--color-primary-text);
+  background: var(--color-danger);
 }
 </style>

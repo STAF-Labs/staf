@@ -55,6 +55,9 @@ import {
   unfreezeUser,
   type UserDetail,
 } from '@/shared/users/users'
+import { pushUserActionNotification } from '@/shared/users/notifications'
+
+type UserActionNotification = Parameters<typeof pushUserActionNotification>[0]
 
 type ProjectStatusFilter = ProjectStatus | 'all'
 type ProjectSortOption = 'title_asc' | 'title_desc' | 'released_at'
@@ -633,7 +636,7 @@ async function loadProjectActivityFilters(): Promise<void> {
 
 async function runUserAction(
   action: () => Promise<UserDetail | { message: string }>,
-  successMessage: string,
+  notification?: UserActionNotification,
 ): Promise<void> {
   if (!user.value) {
     return
@@ -649,7 +652,9 @@ async function runUserAction(
       user.value = response
     }
 
-    message.value = successMessage
+    if (notification) {
+      pushUserActionNotification(notification)
+    }
   } catch {
     message.value = 'Не удалось выполнить действие.'
   } finally {
@@ -680,7 +685,7 @@ function confirmBlock(): void {
 
   const userId = user.value.id
 
-  void runUserAction(() => blockUser(userId), 'Пользователь заблокирован.')
+  void runUserAction(() => blockUser(userId), 'blocked')
 
   isBlockModalOpen.value = false
 }
@@ -692,7 +697,7 @@ function unblock(): void {
 
   const userId = user.value.id
 
-  void runUserAction(() => unblockUser(userId), 'Пользователь разблокирован.')
+  void runUserAction(() => unblockUser(userId), 'unblocked')
 }
 
 function freeze(): void {
@@ -718,7 +723,7 @@ function confirmFreeze(): void {
 
   const userId = user.value.id
 
-  void runUserAction(() => freezeUser(userId), 'Пользователь заморожен.')
+  void runUserAction(() => freezeUser(userId), 'frozen')
 
   isFreezeModalOpen.value = false
 }
@@ -730,7 +735,7 @@ function unfreeze(): void {
 
   const userId = user.value.id
 
-  void runUserAction(() => unfreezeUser(userId), 'Пользователь разморожен.')
+  void runUserAction(() => unfreezeUser(userId), 'unfrozen')
 }
 
 function softDelete(): void {
@@ -761,6 +766,7 @@ async function confirmSoftDelete(): Promise<void> {
 
   try {
     await softDeleteUser(userId)
+    pushUserActionNotification('deleted')
     await router.replace({ name: 'users.index' })
   } catch {
     message.value = 'Не удалось выполнить действие.'
@@ -1168,6 +1174,7 @@ watch(projectContentTypeFilter, () => {
       :open="isBlockModalOpen"
       title="Заблокировать пользователя?"
       :description="blockModalDescription"
+      tone="danger"
       :loading="isActionLoading"
       @cancel="closeBlockModal"
       @confirm="confirmBlock"
@@ -1178,6 +1185,7 @@ watch(projectContentTypeFilter, () => {
       title="Заморозить пользователя?"
       :description="freezeModalDescription"
       icon="snowflake"
+      tone="info"
       confirm-text="Заморозить"
       :loading="isActionLoading"
       @cancel="closeFreezeModal"

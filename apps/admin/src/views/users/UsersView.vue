@@ -16,6 +16,9 @@ import {
   unfreezeUser,
   type UserListItem,
 } from '@/shared/users/users'
+import { pushUserActionNotification } from '@/shared/users/notifications'
+
+type UserActionNotification = Parameters<typeof pushUserActionNotification>[0]
 
 const search = ref('')
 const status = ref('')
@@ -201,7 +204,7 @@ async function loadUsers(): Promise<void> {
 async function runUserAction(
   userId: number,
   action: () => Promise<unknown>,
-  successMessage: string,
+  notification?: UserActionNotification,
 ): Promise<void> {
   actionUserId.value = userId
   message.value = ''
@@ -209,7 +212,9 @@ async function runUserAction(
   try {
     await action()
     await loadUsers()
-    message.value = successMessage
+    if (notification) {
+      pushUserActionNotification(notification)
+    }
   } catch {
     message.value = 'Не удалось выполнить действие.'
   } finally {
@@ -224,7 +229,7 @@ function block(row: Record<string, unknown>): void {
 function unblock(row: Record<string, unknown>): void {
   const userId = Number(row.id)
 
-  void runUserAction(userId, () => unblockUser(userId), 'Пользователь разблокирован.')
+  void runUserAction(userId, () => unblockUser(userId), 'unblocked')
 }
 
 function freeze(row: Record<string, unknown>): void {
@@ -234,7 +239,7 @@ function freeze(row: Record<string, unknown>): void {
 function unfreeze(row: Record<string, unknown>): void {
   const userId = Number(row.id)
 
-  void runUserAction(userId, () => unfreezeUser(userId), 'Пользователь разморожен.')
+  void runUserAction(userId, () => unfreezeUser(userId), 'unfrozen')
 }
 
 function softDelete(row: Record<string, unknown>): void {
@@ -297,7 +302,7 @@ function confirmBlock(): void {
   const row = pendingBlockUser.value
   const userId = Number(row.id)
 
-  void runUserAction(userId, () => blockUser(userId), 'Пользователь заблокирован.')
+  void runUserAction(userId, () => blockUser(userId), 'blocked')
 
   pendingBlockUser.value = null
 }
@@ -310,7 +315,7 @@ function confirmFreeze(): void {
   const row = pendingFreezeUser.value
   const userId = Number(row.id)
 
-  void runUserAction(userId, () => freezeUser(userId), 'Пользователь заморожен.')
+  void runUserAction(userId, () => freezeUser(userId), 'frozen')
 
   pendingFreezeUser.value = null
 }
@@ -323,7 +328,7 @@ function confirmSoftDelete(): void {
   const row = pendingDeleteUser.value
   const userId = Number(row.id)
 
-  void runUserAction(userId, () => softDeleteUser(userId), 'Пользователь удален.')
+  void runUserAction(userId, () => softDeleteUser(userId), 'deleted')
 
   pendingDeleteUser.value = null
 }
@@ -600,6 +605,7 @@ onMounted(() => {
       :open="pendingBlockUser !== null"
       title="Заблокировать пользователя?"
       :description="blockModalDescription"
+      tone="danger"
       :loading="actionUserId !== null"
       @cancel="closeBlockModal"
       @confirm="confirmBlock"
@@ -610,6 +616,7 @@ onMounted(() => {
       title="Заморозить пользователя?"
       :description="freezeModalDescription"
       icon="snowflake"
+      tone="info"
       confirm-text="Заморозить"
       :loading="actionUserId !== null"
       @cancel="closeFreezeModal"

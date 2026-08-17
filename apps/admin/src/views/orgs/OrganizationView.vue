@@ -34,6 +34,7 @@ import {
   unfreezeOrganization,
   type OrganizationDetail,
 } from '@/shared/orgs/organizations'
+import { pushOrganizationActionNotification } from '@/shared/orgs/notifications'
 import {
   fetchProjectContentTypes,
   fetchProjectReleases,
@@ -41,6 +42,8 @@ import {
   type ProjectListItem,
 } from '@/shared/projects/projects'
 import type { DataColumn } from '@/shared/data/table'
+
+type OrganizationActionNotification = Parameters<typeof pushOrganizationActionNotification>[0]
 
 const route = useRoute()
 const router = useRouter()
@@ -255,7 +258,7 @@ async function loadProjectActivityFilters(): Promise<void> {
 
 async function runOrganizationAction(
   action: () => Promise<unknown>,
-  successMessage: string,
+  notification?: OrganizationActionNotification,
 ): Promise<void> {
   if (!organization.value) {
     return
@@ -267,7 +270,9 @@ async function runOrganizationAction(
   try {
     await action()
     await loadOrganization()
-    message.value = successMessage
+    if (notification) {
+      pushOrganizationActionNotification(notification)
+    }
   } catch {
     message.value = 'Не удалось выполнить действие.'
   } finally {
@@ -295,7 +300,7 @@ function confirmBlock(): void {
 
   const organizationId = organization.value.id
 
-  void runOrganizationAction(() => blockOrganization(organizationId), 'Организация заблокирована.')
+  void runOrganizationAction(() => blockOrganization(organizationId), 'blocked')
 
   isBlockModalOpen.value = false
 }
@@ -308,10 +313,7 @@ function unblock(): void {
   const organizationId = organization.value.id
   isMoreOpen.value = false
 
-  void runOrganizationAction(
-    () => unblockOrganization(organizationId),
-    'Организация разблокирована.',
-  )
+  void runOrganizationAction(() => unblockOrganization(organizationId), 'unblocked')
 }
 
 function freeze(): void {
@@ -334,7 +336,7 @@ function confirmFreeze(): void {
 
   const organizationId = organization.value.id
 
-  void runOrganizationAction(() => freezeOrganization(organizationId), 'Организация заморожена.')
+  void runOrganizationAction(() => freezeOrganization(organizationId), 'frozen')
 
   isFreezeModalOpen.value = false
 }
@@ -347,7 +349,7 @@ function unfreeze(): void {
   const organizationId = organization.value.id
   isMoreOpen.value = false
 
-  void runOrganizationAction(() => unfreezeOrganization(organizationId), 'Организация разморожена.')
+  void runOrganizationAction(() => unfreezeOrganization(organizationId), 'unfrozen')
 }
 
 function softDelete(): void {
@@ -375,6 +377,7 @@ async function confirmSoftDelete(): Promise<void> {
 
   try {
     await softDeleteOrganization(organizationId)
+    pushOrganizationActionNotification('deleted')
     await router.replace({ name: 'orgs.index' })
   } catch {
     message.value = 'Не удалось выполнить действие.'
@@ -707,6 +710,7 @@ onMounted(() => {
       :open="isBlockModalOpen"
       title="Заблокировать организацию?"
       :description="blockModalDescription"
+      tone="danger"
       :loading="isActionLoading"
       @cancel="closeBlockModal"
       @confirm="confirmBlock"
@@ -717,6 +721,7 @@ onMounted(() => {
       title="Заморозить организацию?"
       :description="freezeModalDescription"
       icon="snowflake"
+      tone="info"
       confirm-text="Заморозить"
       :loading="isActionLoading"
       @cancel="closeFreezeModal"

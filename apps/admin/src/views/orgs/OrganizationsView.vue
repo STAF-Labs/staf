@@ -16,6 +16,9 @@ import {
   unfreezeOrganization,
   type OrganizationListItem,
 } from '@/shared/orgs/organizations'
+import { pushOrganizationActionNotification } from '@/shared/orgs/notifications'
+
+type OrganizationActionNotification = Parameters<typeof pushOrganizationActionNotification>[0]
 
 const search = ref('')
 const status = ref('')
@@ -190,7 +193,7 @@ async function loadOrganizations(): Promise<void> {
 async function runOrganizationAction(
   organizationId: number,
   action: () => Promise<unknown>,
-  successMessage: string,
+  notification?: OrganizationActionNotification,
 ): Promise<void> {
   actionOrganizationId.value = organizationId
   message.value = ''
@@ -198,7 +201,9 @@ async function runOrganizationAction(
   try {
     await action()
     await loadOrganizations()
-    message.value = successMessage
+    if (notification) {
+      pushOrganizationActionNotification(notification)
+    }
   } catch {
     message.value = 'Не удалось выполнить действие.'
   } finally {
@@ -216,7 +221,7 @@ function unblock(row: Record<string, unknown>): void {
   void runOrganizationAction(
     organizationId,
     () => unblockOrganization(organizationId),
-    'Организация разблокирована.',
+    'unblocked',
   )
 }
 
@@ -230,7 +235,7 @@ function unfreeze(row: Record<string, unknown>): void {
   void runOrganizationAction(
     organizationId,
     () => unfreezeOrganization(organizationId),
-    'Организация разморожена.',
+    'unfrozen',
   )
 }
 
@@ -297,7 +302,7 @@ function confirmBlock(): void {
   void runOrganizationAction(
     organizationId,
     () => blockOrganization(organizationId),
-    'Организация заблокирована.',
+    'blocked',
   )
 
   pendingBlockOrganization.value = null
@@ -314,7 +319,7 @@ function confirmFreeze(): void {
   void runOrganizationAction(
     organizationId,
     () => freezeOrganization(organizationId),
-    'Организация заморожена.',
+    'frozen',
   )
 
   pendingFreezeOrganization.value = null
@@ -331,7 +336,7 @@ function confirmSoftDelete(): void {
   void runOrganizationAction(
     organizationId,
     () => softDeleteOrganization(organizationId),
-    'Организация удалена.',
+    'deleted',
   )
 
   pendingDeleteOrganization.value = null
@@ -594,6 +599,7 @@ onMounted(() => {
       :open="pendingBlockOrganization !== null"
       title="Заблокировать организацию?"
       :description="blockModalDescription"
+      tone="danger"
       :loading="actionOrganizationId !== null"
       @cancel="closeBlockModal"
       @confirm="confirmBlock"
@@ -604,6 +610,7 @@ onMounted(() => {
       title="Заморозить организацию?"
       :description="freezeModalDescription"
       icon="snowflake"
+      tone="info"
       confirm-text="Заморозить"
       :loading="actionOrganizationId !== null"
       @cancel="closeFreezeModal"
