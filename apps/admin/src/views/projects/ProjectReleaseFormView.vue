@@ -15,6 +15,7 @@ import {
   type ProjectRelease,
   updateProjectRelease,
 } from '@/shared/projects/projects'
+import { pushProjectActionNotification } from '@/shared/projects/notifications'
 import { uploadTotalSizeError } from '@/shared/uploads/upload-limits'
 import '@/assets/styles/game-form.css'
 
@@ -205,11 +206,13 @@ async function submitRelease(): Promise<void> {
 
     if (isEditMode.value) {
       await updateProjectRelease(projectId.value, releaseId.value, payload)
+      pushProjectActionNotification('releaseUpdated')
     } else {
       await createProjectRelease(projectId.value, {
         ...payload,
         file: form.file as File,
       })
+      pushProjectActionNotification('releaseCreated')
     }
 
     await router.push({ name: 'projects.edit', params: { id: String(projectId.value) } })

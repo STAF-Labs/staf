@@ -58,6 +58,7 @@ import {
   type ProjectRelease,
   type ProjectScreenshot,
 } from '@/shared/projects/projects'
+import { pushProjectActionNotification } from '@/shared/projects/notifications'
 import { uploadTotalSizeError } from '@/shared/uploads/upload-limits'
 import '@/assets/styles/game-form.css'
 
@@ -614,8 +615,7 @@ async function saveScreenshotsTab(): Promise<void> {
     project.value = updatedProject
     form.screenshots = updatedProject.screenshots
     clearSelectedScreenshots()
-    messageKind.value = 'success'
-    message.value = 'Скриншоты сохранены.'
+    pushProjectActionNotification('screenshotsSaved')
     await nextTick()
     initializeScreenshotsSortable()
   } catch {
@@ -709,6 +709,7 @@ async function removePersistedScreenshot(screenshot: ProjectScreenshot): Promise
 
     project.value = updatedProject
     form.screenshots = updatedProject.screenshots
+    pushProjectActionNotification('screenshotDeleted')
     await nextTick()
     initializeScreenshotsSortable()
   } catch {
@@ -776,8 +777,7 @@ async function saveDescriptionTab(): Promise<void> {
     form.description = updatedProject.description
     form.descriptionFilled = richTextIsFilled(updatedProject.description)
     setDescriptionTabBaseline()
-    messageKind.value = 'success'
-    message.value = 'Описание сохранено.'
+    pushProjectActionNotification('updated')
   } catch {
     messageKind.value = 'error'
     message.value = 'Не удалось сохранить описание.'
@@ -807,8 +807,7 @@ async function saveLicenceTab(): Promise<void> {
     project.value = updatedProject
     form.licenceName = updatedProject.licence_name ?? ''
     setLicenceTabBaseline()
-    messageKind.value = 'success'
-    message.value = 'Лицензия сохранена.'
+    pushProjectActionNotification('updated')
   } catch {
     messageKind.value = 'error'
     message.value = 'Не удалось сохранить лицензию.'
@@ -1017,6 +1016,7 @@ async function confirmReleaseDelete(): Promise<void> {
     await deleteProjectRelease(project.value.id, release.id)
     projectReleases.value = projectReleases.value.filter((item) => item.id !== release.id)
     pendingDeleteRelease.value = null
+    pushProjectActionNotification('releaseDeleted')
   } catch {
     messageKind.value = 'error'
     message.value = 'Не удалось удалить релиз.'
@@ -1106,6 +1106,7 @@ async function submitProjectMember(keepOpen: boolean): Promise<void> {
     selectedMemberCandidate.value = null
     memberModalSearch.value = ''
     memberCandidates.value = []
+    pushProjectActionNotification('memberAdded')
 
     if (!keepOpen) {
       isMemberModalOpen.value = false
@@ -1569,8 +1570,7 @@ async function saveMainTab(): Promise<void> {
     initializeDimensionPaths()
     setLogoPreview(updatedProject.logo_url)
     setMainTabBaseline()
-    messageKind.value = 'success'
-    message.value = 'Основное сохранено.'
+    pushProjectActionNotification('updated')
 
     if (releaseFiltersLoaded.value) {
       releaseFiltersLoaded.value = false

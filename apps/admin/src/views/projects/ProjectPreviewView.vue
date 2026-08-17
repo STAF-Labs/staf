@@ -43,6 +43,7 @@ import {
   type ProjectPublicationStatus,
   type ProjectRelease,
 } from '@/shared/projects/projects'
+import { pushProjectActionNotification } from '@/shared/projects/notifications'
 import ProjectReleasesTable from '@/views/projects/components/ProjectReleasesTable.vue'
 
 type ReleaseFilterState = {
@@ -607,6 +608,7 @@ async function changePublicationStatus(event: Event): Promise<void> {
     })
 
     project.value = updatedProject
+    pushProjectActionNotification('statusChanged')
   } catch {
     select.value = previousStatus
     publicationStatusError.value = 'Не удалось изменить статус.'
@@ -625,6 +627,7 @@ async function confirmDeleteProject(): Promise<void> {
 
   try {
     await removeProject(project.value.id)
+    pushProjectActionNotification('deleted')
     await router.push({ name: 'projects.index' })
   } catch {
     deleteProjectError.value = 'Не удалось удалить проект.'

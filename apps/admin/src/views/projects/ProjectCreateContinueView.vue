@@ -13,6 +13,7 @@ import {
   type GameDimension,
 } from '@/shared/games/games'
 import { updateProjectDraft } from '@/shared/projects/projects'
+import { pushProjectActionNotification } from '@/shared/projects/notifications'
 import {
   calculateProjectPercentageComplete,
   hydrateProjectCreateDraft,
@@ -133,6 +134,7 @@ async function saveProject(): Promise<void> {
     })
 
     resetProjectCreateDraft()
+    pushProjectActionNotification('created')
     await router.push({ name: 'projects.index' })
   } catch (error) {
     message.value = error instanceof Error ? error.message : 'Не удалось создать проект.'

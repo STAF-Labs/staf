@@ -22,6 +22,7 @@ import {
   type ProjectListItem,
   type ProjectStatus,
 } from '@/shared/projects/projects'
+import { pushProjectActionNotification } from '@/shared/projects/notifications'
 
 type StatusFilter = ProjectStatus | 'all'
 type SortOption = 'title_asc' | 'title_desc' | 'released_at'
@@ -461,6 +462,7 @@ async function confirmDelete(): Promise<void> {
   try {
     await removeProject(project.id)
     projects.value = projects.value.filter(({ id }) => id !== project.id)
+    pushProjectActionNotification('deleted')
   } catch {
     message.value = 'Не удалось удалить проект.'
   } finally {
