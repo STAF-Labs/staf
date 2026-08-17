@@ -6,6 +6,7 @@ import { computed, onBeforeUnmount, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppShell from '@/components/layout/AppShell.vue'
 import { createGame, fetchGame, updateGame, type GameStatus } from '@/shared/games/games'
+import { pushGameActionNotification } from '@/shared/games/notifications'
 import '@/assets/styles/game-form.css'
 
 type GameForm = {
@@ -291,13 +292,13 @@ async function submit(): Promise<void> {
       route.meta.breadcrumbLabel = game.name
       setPreviewUrl('logo', null)
       setPreviewUrl('banner', null)
-      messageType.value = 'success'
-      message.value = 'Игра сохранена.'
+      pushGameActionNotification('updated')
 
       return
     }
 
     await createGame(payload)
+    pushGameActionNotification('created')
 
     await router.push({ name: 'games.index' })
   } catch {

@@ -5,6 +5,7 @@ import AppShell from '@/components/layout/AppShell.vue'
 import DeleteModal from '@/components/ui/DeleteModal.vue'
 import SearchField from '@/components/ui/SearchField.vue'
 import { deleteGame, fetchGames, type GameListItem, type GameStatus } from '@/shared/games/games'
+import { pushGameActionNotification } from '@/shared/games/notifications'
 
 type StatusFilter = GameStatus | 'all'
 type SortOption = 'name_asc' | 'name_desc' | 'released_at'
@@ -181,7 +182,7 @@ async function confirmDelete(): Promise<void> {
   try {
     await deleteGame(gameId)
     await loadGames()
-    message.value = 'Игра удалена.'
+    pushGameActionNotification('deleted')
   } catch {
     message.value = 'Не удалось удалить игру.'
   } finally {

@@ -49,6 +49,7 @@ import {
   type GameDimension,
   type GameDimensionValue,
 } from '@/shared/games/games'
+import { pushGameActionNotification } from '@/shared/games/notifications'
 import {
   deleteProject as removeProject,
   fetchProjectReleases,
@@ -56,6 +57,7 @@ import {
   type ProjectListItem,
   type ProjectStatus,
 } from '@/shared/projects/projects'
+import { pushProjectActionNotification } from '@/shared/projects/notifications'
 import '@/assets/styles/game-view.css'
 
 type ProjectStatusFilter = ProjectStatus | 'all'
@@ -390,6 +392,7 @@ async function confirmDeleteGame(): Promise<void> {
 
   try {
     await removeGame(game.value.id)
+    pushGameActionNotification('deleted')
     await router.push({ name: 'games.index' })
   } catch {
     deleteGameError.value = 'Не удалось удалить игру.'
@@ -646,6 +649,7 @@ async function confirmDeleteProject(): Promise<void> {
   try {
     await removeProject(project.id)
     projects.value = projects.value.filter(({ id }) => id !== project.id)
+    pushProjectActionNotification('deleted')
   } catch {
     message.value = 'Не удалось удалить проект.'
   } finally {
@@ -1340,7 +1344,6 @@ async function submitCopyFilters(): Promise<void> {
     }
 
     isCopyFiltersModalOpen.value = false
-    message.value = `Фильтры скопированы: новых ${response.created_filters}, переиспользовано ${response.reused_filters}; значений добавлено ${response.created_values}, дублей пропущено ${response.skipped_values}.`
   } catch (error) {
     message.value = apiErrorMessage(error, 'Не удалось скопировать фильтры.')
   } finally {

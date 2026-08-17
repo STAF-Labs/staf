@@ -16,6 +16,7 @@ import {
   type GameDimensionImportFilterRow,
   type GameDimensionImportValueRow,
 } from '@/shared/games/games'
+import { pushGameActionNotification } from '@/shared/games/notifications'
 
 const maxFileSize = 10 * 1024 * 1024
 const importAccept = [
@@ -34,7 +35,6 @@ const previewFilters = ref<GameDimensionImportFilterRow[]>([])
 const previewValues = ref<GameDimensionImportValueRow[]>([])
 const fileError = ref('')
 const pageError = ref('')
-const message = ref('')
 const isValidatingFile = ref(false)
 const isImporting = ref(false)
 
@@ -90,7 +90,6 @@ async function chooseFile(event: Event): Promise<void> {
 
 async function selectFile(file?: File): Promise<void> {
   fileError.value = ''
-  message.value = ''
 
   if (!file) {
     removeFile()
@@ -133,15 +132,11 @@ async function selectFile(file?: File): Promise<void> {
   }
 }
 
-function removeFile(clearMessage = true): void {
+function removeFile(): void {
   selectedFile.value = null
   previewFilters.value = []
   previewValues.value = []
   fileError.value = ''
-
-  if (clearMessage) {
-    message.value = ''
-  }
 
   removeInputValue()
 }
@@ -159,13 +154,12 @@ async function importFile(): Promise<void> {
 
   isImporting.value = true
   fileError.value = ''
-  message.value = ''
 
   try {
-    const response = await importGameDimensionFile(gameId, gameContentTypeId, selectedFile.value)
+    await importGameDimensionFile(gameId, gameContentTypeId, selectedFile.value)
 
-    message.value = `Импорт завершён. Создано фильтров: ${response.created_filters}, значений: ${response.created_values}. Пропущено существующих фильтров: ${response.reused_filters}, значений: ${response.skipped_values}.`
-    removeFile(false)
+    pushGameActionNotification('filtersImported')
+    removeFile()
   } catch (error) {
     fileError.value = fileValidationMessage(error)
   } finally {
@@ -343,9 +337,6 @@ game_version,v1_21,1.21,,10,true</code></pre>
           }}
         </p>
       </div>
-
-      <p v-if="message" class="data-page__message">{{ message }}</p>
-
       <div v-if="previewRows.length > 0" class="data-table-panel content-type-import-preview">
         <p class="content-type-import-preview__count">{{ previewTitle }}</p>
 
