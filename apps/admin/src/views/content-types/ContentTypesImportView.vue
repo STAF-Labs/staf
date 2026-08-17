@@ -10,6 +10,7 @@ import {
   validateContentTypeImportFile,
   type ContentTypeImportRow,
 } from '@/shared/content-types/content-types'
+import { pushContentTypeActionNotification } from '@/shared/content-types/notifications'
 
 const acceptedImportExtensions = ['.csv', '.xlsx']
 const acceptedImportTypes = [
@@ -26,7 +27,6 @@ const importInput = ref<HTMLInputElement | null>(null)
 const selectedFile = ref<File | null>(null)
 const previewRows = ref<ContentTypeImportRow[]>([])
 const fileError = ref('')
-const message = ref('')
 const isValidatingFile = ref(false)
 const isImporting = ref(false)
 
@@ -50,7 +50,6 @@ async function chooseFile(event: Event): Promise<void> {
   const [file] = Array.from(input.files ?? [])
 
   fileError.value = ''
-  message.value = ''
 
   if (!file) {
     selectedFile.value = null
@@ -87,14 +86,10 @@ async function chooseFile(event: Event): Promise<void> {
   }
 }
 
-function removeFile(clearMessage = true): void {
+function removeFile(): void {
   selectedFile.value = null
   previewRows.value = []
   fileError.value = ''
-
-  if (clearMessage) {
-    message.value = ''
-  }
 
   if (importInput.value) {
     importInput.value.value = ''
@@ -108,15 +103,15 @@ async function importFile(): Promise<void> {
 
   isImporting.value = true
   fileError.value = ''
-  message.value = ''
 
   try {
-    const response = await importContentTypeFile(selectedFile.value)
+    await importContentTypeFile(selectedFile.value)
 
-    message.value = `Импорт завершен. Создано: ${response.imported_count}. Пропущено: ${response.skipped_count}.`
-    removeFile(false)
+    pushContentTypeActionNotification('imported')
+    removeFile()
   } catch (error) {
     fileError.value = fileValidationMessage(error)
+    pushContentTypeActionNotification('importFailed')
   } finally {
     isImporting.value = false
   }
@@ -239,8 +234,6 @@ function fileValidationMessage(error: unknown): string {
           {{ isValidatingFile ? 'Проверяем заголовки таблицы на сервере.' : 'Поддерживаются CSV в UTF-8 и Excel .xlsx.' }}
         </p>
       </div>
-
-      <p v-if="message" class="data-page__message">{{ message }}</p>
 
       <div v-if="previewRows.length > 0" class="data-table-panel content-type-import-preview">
         <p class="content-type-import-preview__count">{{ previewTitle }}</p>

@@ -26,6 +26,7 @@ import {
   type ContentTypeListItem,
   type CreateContentTypePayload,
 } from '@/shared/content-types/content-types'
+import { pushContentTypeActionNotification } from '@/shared/content-types/notifications'
 import { fetchGames, type GameListItem } from '@/shared/games/games'
 
 type PublicFilter = 'all' | 'public' | 'private'
@@ -272,9 +273,7 @@ async function togglePublic(row: Record<string, unknown>): Promise<void> {
     contentTypes.value = contentTypes.value.map((contentType) =>
       contentType.id === updatedContentType.id ? updatedContentType : contentType,
     )
-    message.value = updatedContentType.is_public
-      ? 'Тип контента опубликован.'
-      : 'Тип контента скрыт.'
+    pushContentTypeActionNotification('statusChanged')
   } catch {
     message.value = 'Не удалось переключить публичность типа контента.'
   } finally {
@@ -313,7 +312,7 @@ async function confirmDelete(): Promise<void> {
   try {
     await deleteContentTypeRequest(contentTypeId)
     await loadContentTypes()
-    message.value = 'Тип контента удален.'
+    pushContentTypeActionNotification('deleted')
   } catch (error) {
     message.value = apiErrorMessage(error, 'Не удалось удалить тип контента.')
   } finally {
@@ -334,11 +333,11 @@ async function createContentType(payload: CreateContentTypePayload): Promise<voi
       contentTypes.value = contentTypes.value.map((contentType) =>
         contentType.id === updatedContentType.id ? updatedContentType : contentType,
       )
-      message.value = 'Тип контента обновлен.'
+      pushContentTypeActionNotification('updated')
     } else {
       await createContentTypeRequest(payload)
       await loadContentTypes()
-      message.value = 'Тип контента создан.'
+      pushContentTypeActionNotification('created')
     }
 
     isCreateModalOpen.value = false
