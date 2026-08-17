@@ -1,57 +1,105 @@
 <script setup lang="ts">
 import {
   AlertTriangle,
-  Bell,
   CheckCircle2,
   ChevronRight,
   Info,
   LoaderCircle,
+  MousePointerClick,
   ShieldAlert,
   type LucideIcon,
 } from '@lucide/vue'
 import { push } from 'notivue'
 import DebugShell from '@/components/debug/DebugShell.vue'
 
+interface NotificationAction {
+  label: string
+  tone?: 'default' | 'primary' | 'danger'
+  onClick: () => void
+}
+
+interface ActionNotificationProps {
+  actions: NotificationAction[]
+  actor: {
+    initials: string
+    label: string
+    meta: string
+  }
+  variant: 'action'
+}
+
 function showSuccessNotification(): void {
   push.success({
     title: 'Данные сохранены',
-    message: 'Изменения применены и доступны пользователям.',
   })
 }
 
 function showInfoNotification(): void {
   push.info({
     title: 'Новое сообщение',
-    message: 'Пользователь отправил вам сообщение.',
   })
 }
 
 function showWarningNotification(): void {
   push.warning({
     title: 'Проверьте данные',
-    message: 'Некоторые поля требуют внимания перед публикацией.',
   })
 }
 
 function showDangerNotification(): void {
   push.error({
     title: 'Не удалось выполнить действие',
-    message: 'Повторите попытку или проверьте подключение.',
   })
 }
 
 function showPromiseNotification(): void {
   const notification = push.promise({
     title: 'Загрузка',
-    message: 'Выполняем тестовую операцию.',
   })
 
   window.setTimeout(() => {
     notification.success({
       title: 'Операция завершена',
-      message: 'Promise-уведомление перешло в success.',
     })
   }, 1400)
+}
+
+function showActionsNotification(): void {
+  const notification = push.info<ActionNotificationProps>({
+    title: 'Подтвердите действие',
+    message: 'просит подтвердить публикацию изменений.',
+    duration: 12000,
+    props: {
+      actor: {
+        initials: 'ST',
+        label: 'STAF Admin',
+        meta: '1 минуту назад',
+      },
+      actions: [
+        {
+          label: 'Отклонить',
+          tone: 'danger',
+          onClick: () => {
+            notification.clear()
+            push.info({
+              title: 'Действие отменено',
+            })
+          },
+        },
+        {
+          label: 'Применить',
+          tone: 'primary',
+          onClick: () => {
+            notification.clear()
+            push.success({
+              title: 'Действие применено',
+            })
+          },
+        },
+      ],
+      variant: 'action',
+    },
+  })
 }
 
 const notificationButtons = [
@@ -95,11 +143,19 @@ const notificationButtons = [
     icon: LoaderCircle,
     action: showPromiseNotification,
   },
+  {
+    label: 'Actions',
+    badge: 'Кнопки',
+    description: 'Показывает уведомление с action-кнопками.',
+    tone: 'actions',
+    icon: MousePointerClick,
+    action: showActionsNotification,
+  },
 ] satisfies {
   label: string
   badge: string
   description: string
-  tone: 'success' | 'info' | 'warning' | 'danger' | 'promise'
+  tone: 'success' | 'info' | 'warning' | 'danger' | 'promise' | 'actions'
   icon: LucideIcon
   action: () => void
 }[]
@@ -312,6 +368,10 @@ const notificationButtons = [
 
 .debug-notifications-panel--promise {
   --debug-card-accent: var(--color-primary);
+}
+
+.debug-notifications-panel--actions {
+  --debug-card-accent: var(--color-info);
 }
 
 @media (max-width: 700px) {

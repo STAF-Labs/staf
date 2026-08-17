@@ -1,106 +1,85 @@
 :root,
 [data-theme='light'] {
-  --nv-width: min(420px, calc(100vw - 32px));
-  --nv-min-width: 320px;
-  --nv-spacing: 16px;
-  --nv-radius: var(--radius-md);
+  --nv-width: min(380px, calc(100vw - 32px));
+  --nv-min-width: 300px;
+  --nv-spacing: 14px;
+  --nv-radius: 8px;
   --nv-border-width: 1px;
-  --nv-icon-size: 22px;
-  --nv-title-size: 0.95rem;
+  --nv-icon-size: 24px;
+  --nv-title-size: 0.875rem;
   --nv-message-size: 0.875rem;
-  --nv-tip-width: 4px;
-  --nv-y-align: flex-start;
-  --nv-y-align-has-title: flex-start;
-  --nv-progress-height: 4px;
+  --nv-tip-width: 0px;
+  --nv-y-align: center;
+  --nv-y-align-has-title: center;
+  --nv-progress-height: 3px;
   --nv-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.1),
-    0 18px 46px rgb(0 0 0 / 0.18);
+    0 14px 34px rgb(31 31 34 / 0.12),
+    0 2px 8px rgb(31 31 34 / 0.08);
 
-  --nv-global-bg: color-mix(in srgb, var(--color-surface) 82%, transparent);
+  --nv-global-bg: color-mix(in srgb, var(--color-surface) 98%, transparent);
   --nv-global-fg: var(--color-text);
-  --nv-global-border: color-mix(in srgb, var(--color-border) 68%, transparent);
+  --nv-global-border: color-mix(in srgb, var(--color-border) 86%, transparent);
   --nv-global-accent: var(--color-primary);
 
-  --nv-success-bg:
-    radial-gradient(circle at 14% 0%, color-mix(in srgb, var(--color-success) 18%, transparent), transparent 45%),
-    color-mix(in srgb, var(--color-surface) 86%, transparent);
-  --nv-success-fg: #164f36;
-  --nv-success-border: color-mix(in srgb, var(--color-success) 32%, var(--color-border));
+  --nv-success-bg: var(--nv-global-bg);
+  --nv-success-fg: var(--color-text);
+  --nv-success-border: var(--nv-global-border);
   --nv-success-accent: var(--color-success);
 
-  --nv-info-bg:
-    radial-gradient(circle at 14% 0%, color-mix(in srgb, var(--color-info) 18%, transparent), transparent 45%),
-    color-mix(in srgb, var(--color-surface) 86%, transparent);
-  --nv-info-fg: #174273;
-  --nv-info-border: color-mix(in srgb, var(--color-info) 32%, var(--color-border));
+  --nv-info-bg: var(--nv-global-bg);
+  --nv-info-fg: var(--color-text);
+  --nv-info-border: var(--nv-global-border);
   --nv-info-accent: var(--color-info);
 
-  --nv-warning-bg:
-    radial-gradient(circle at 14% 0%, color-mix(in srgb, var(--color-warning) 18%, transparent), transparent 45%),
-    color-mix(in srgb, var(--color-surface) 86%, transparent);
-  --nv-warning-fg: #68410a;
-  --nv-warning-border: color-mix(in srgb, var(--color-warning) 34%, var(--color-border));
+  --nv-warning-bg: var(--nv-global-bg);
+  --nv-warning-fg: var(--color-text);
+  --nv-warning-border: var(--nv-global-border);
   --nv-warning-accent: var(--color-warning);
 
-  --nv-error-bg:
-    radial-gradient(circle at 14% 0%, color-mix(in srgb, var(--color-danger) 18%, transparent), transparent 45%),
-    color-mix(in srgb, var(--color-surface) 86%, transparent);
-  --nv-error-fg: #7a2222;
-  --nv-error-border: color-mix(in srgb, var(--color-danger) 34%, var(--color-border));
+  --nv-error-bg: var(--nv-global-bg);
+  --nv-error-fg: var(--color-text);
+  --nv-error-border: var(--nv-global-border);
   --nv-error-accent: var(--color-danger);
 
-  --nv-promise-bg:
-    radial-gradient(circle at 14% 0%, color-mix(in srgb, var(--color-primary) 18%, transparent), transparent 45%),
-    color-mix(in srgb, var(--color-surface) 86%, transparent);
+  --nv-promise-bg: var(--nv-global-bg);
   --nv-promise-fg: var(--color-text);
-  --nv-promise-border: color-mix(in srgb, var(--color-primary) 32%, var(--color-border));
+  --nv-promise-border: var(--nv-global-border);
   --nv-promise-accent: var(--color-primary);
 }
 
 [data-theme='dark'] {
-  --nv-global-bg: color-mix(in srgb, var(--color-surface) 72%, transparent);
+  --nv-shadow:
+    0 18px 44px rgb(0 0 0 / 0.34),
+    0 2px 10px rgb(0 0 0 / 0.26);
+
+  --nv-global-bg: color-mix(in srgb, var(--color-surface) 96%, transparent);
   --nv-global-fg: var(--color-text);
-  --nv-global-border: color-mix(in srgb, var(--color-border) 72%, transparent);
+  --nv-global-border: color-mix(in srgb, var(--color-border) 92%, transparent);
   --nv-global-accent: var(--color-primary);
 
-  --nv-success-bg:
-    radial-gradient(circle at 13% 0%, color-mix(in srgb, var(--color-success) 26%, transparent), transparent 48%),
-    linear-gradient(135deg, color-mix(in srgb, var(--color-success) 11%, transparent), transparent 46%),
-    color-mix(in srgb, var(--color-surface) 70%, transparent);
-  --nv-success-fg: #d9f7e7;
-  --nv-success-border: color-mix(in srgb, var(--color-success) 36%, var(--color-border));
+  --nv-success-bg: var(--nv-global-bg);
+  --nv-success-fg: var(--color-text);
+  --nv-success-border: var(--nv-global-border);
   --nv-success-accent: var(--color-success);
 
-  --nv-info-bg:
-    radial-gradient(circle at 13% 0%, color-mix(in srgb, var(--color-info) 26%, transparent), transparent 48%),
-    linear-gradient(135deg, color-mix(in srgb, var(--color-info) 11%, transparent), transparent 46%),
-    color-mix(in srgb, var(--color-surface) 70%, transparent);
-  --nv-info-fg: #d8ebff;
-  --nv-info-border: color-mix(in srgb, var(--color-info) 36%, var(--color-border));
+  --nv-info-bg: var(--nv-global-bg);
+  --nv-info-fg: var(--color-text);
+  --nv-info-border: var(--nv-global-border);
   --nv-info-accent: var(--color-info);
 
-  --nv-warning-bg:
-    radial-gradient(circle at 13% 0%, color-mix(in srgb, var(--color-warning) 26%, transparent), transparent 48%),
-    linear-gradient(135deg, color-mix(in srgb, var(--color-warning) 11%, transparent), transparent 46%),
-    color-mix(in srgb, var(--color-surface) 70%, transparent);
-  --nv-warning-fg: #fff0c9;
-  --nv-warning-border: color-mix(in srgb, var(--color-warning) 38%, var(--color-border));
+  --nv-warning-bg: var(--nv-global-bg);
+  --nv-warning-fg: var(--color-text);
+  --nv-warning-border: var(--nv-global-border);
   --nv-warning-accent: var(--color-warning);
 
-  --nv-error-bg:
-    radial-gradient(circle at 13% 0%, color-mix(in srgb, var(--color-danger) 26%, transparent), transparent 48%),
-    linear-gradient(135deg, color-mix(in srgb, var(--color-danger) 11%, transparent), transparent 46%),
-    color-mix(in srgb, var(--color-surface) 70%, transparent);
-  --nv-error-fg: #ffe1e1;
-  --nv-error-border: color-mix(in srgb, var(--color-danger) 38%, var(--color-border));
+  --nv-error-bg: var(--nv-global-bg);
+  --nv-error-fg: var(--color-text);
+  --nv-error-border: var(--nv-global-border);
   --nv-error-accent: var(--color-danger);
 
-  --nv-promise-bg:
-    radial-gradient(circle at 13% 0%, color-mix(in srgb, var(--color-primary) 26%, transparent), transparent 48%),
-    linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 11%, transparent), transparent 46%),
-    color-mix(in srgb, var(--color-surface) 70%, transparent);
+  --nv-promise-bg: var(--nv-global-bg);
   --nv-promise-fg: var(--color-text);
-  --nv-promise-border: color-mix(in srgb, var(--color-primary) 36%, var(--color-border));
+  --nv-promise-border: var(--nv-global-border);
   --nv-promise-accent: var(--color-primary);
 }
 
@@ -108,29 +87,46 @@
   overflow: hidden;
   background: var(--nv-bg, var(--nv-global-bg));
   backdrop-filter: blur(18px);
+  min-height: 64px;
 }
 
 .Notivue__content-title {
   font-family: var(--font-heading), sans-serif;
-  font-weight: 800;
+  font-weight: 750;
+  letter-spacing: 0;
 }
 
 .Notivue__content-message {
   color: currentColor;
-  opacity: 0.82;
+  opacity: 0.74;
 }
 
 .Notivue__close {
+  align-self: center;
   border-radius: var(--radius-sm);
+  opacity: 0.7;
+  transition:
+    background-color 140ms ease,
+    opacity 140ms ease;
+}
+
+.Notivue__close:hover {
+  opacity: 1;
 }
 
 .Notivue__icon {
-  padding: 6px;
-  background: color-mix(in srgb, var(--nv-accent) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--nv-accent) 30%, transparent);
+  padding: 0;
+  color: var(--nv-accent);
+  background: transparent;
+  border: 0;
   border-radius: 999px;
 }
 
+.Notivue__icon svg {
+  width: var(--nv-icon-size);
+  height: var(--nv-icon-size);
+}
+
 .Notivue__progress {
-  opacity: 0.95;
+  opacity: 1;
 }

@@ -1,33 +1,50 @@
+.staf-notification--with-actions {
+  padding-bottom: 58px;
+}
+
 .staf-notification-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
+  justify-content: flex-end;
+  gap: 10px;
+  position: absolute;
+  right: var(--nv-spacing);
+  bottom: calc(var(--nv-progress-height) + 14px);
+  max-width: calc(100% - var(--nv-spacing) * 2);
 }
 
 .staf-notification-action {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font-size: 0.8125rem;
-  font-weight: 600;
+  min-width: 78px;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 72%, var(--color-border));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  color: var(--color-primary);
+  font-size: 0.875rem;
+  font-weight: 750;
   line-height: 1;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.04);
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease,
+    transform 140ms ease;
 }
 
 .staf-notification-action:hover {
-  background: var(--color-surface-hover);
+  background: color-mix(in srgb, var(--color-primary) 9%, var(--color-surface));
+  transform: translateY(-1px);
 }
 
 .staf-notification-action--primary {
   border-color: var(--color-primary);
   background: var(--color-primary);
   color: var(--color-primary-text);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--color-primary) 24%, transparent);
 }
 
 .staf-notification-action--primary:hover {
@@ -35,6 +52,96 @@
 }
 
 .staf-notification-action--danger {
-  border-color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 72%, var(--color-border));
   color: var(--color-danger);
+}
+
+.staf-notification-action--danger:hover {
+  background: color-mix(in srgb, var(--color-danger) 9%, var(--color-surface));
+}
+
+.staf-action-notification {
+  position: relative;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  column-gap: 12px;
+  width: var(--nv-width, 100%);
+  max-width: calc(100vw - 32px);
+  min-height: 118px;
+  padding: 14px 14px 16px;
+  overflow: hidden;
+  color: var(--color-text);
+  background: var(--nv-bg, var(--nv-global-bg));
+  backdrop-filter: blur(18px);
+  border: var(--nv-border-width, 0) solid var(--nv-border, var(--nv-global-border));
+  border-radius: var(--nv-radius, 0);
+  box-shadow: var(--nv-shadow, 0 0 rgb(0 0 0 / 0));
+}
+
+.staf-action-notification__avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  color: var(--color-primary-text);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-primary) 82%, var(--color-info)), var(--color-info));
+  border-radius: 50%;
+  font-size: 0.8125rem;
+  font-weight: 850;
+  letter-spacing: 0;
+}
+
+.staf-action-notification__avatar-status {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 12px;
+  height: 12px;
+  background: var(--color-success);
+  border: 2px solid var(--color-surface);
+  border-radius: 50%;
+}
+
+.staf-action-notification__content {
+  min-width: 0;
+}
+
+.staf-action-notification__meta {
+  margin: 0 0 5px;
+  color: var(--color-text-soft);
+  font-size: 0.8125rem;
+  line-height: 1.2;
+}
+
+.staf-action-notification__message {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.35;
+}
+
+.staf-action-notification__message strong {
+  color: var(--color-text);
+  font-weight: 800;
+}
+
+.staf-notification-actions--inline {
+  position: static;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  margin-top: 14px;
+  max-width: none;
+}
+
+.staf-action-notification .Notivue__progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: var(--nv-progress-height, 3px);
+  background-color: var(--nv-accent);
+  border-radius: 0;
 }
